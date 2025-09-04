@@ -99,6 +99,16 @@ class ApiService {
     return response.data;
   }
 
+  // File upload method
+  async uploadFile<T>(endpoint: string, formData: FormData): Promise<ApiResponse<T>> {
+    const response = await this.api.post(endpoint, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  }
+
   // Technicians specific methods
   async getTechnicians(params?: any): Promise<ApiResponse<any>> {
     return this.get('/technicians', params);
@@ -122,6 +132,62 @@ class ApiService {
 
   async toggleTechnicianAvailability(id: string): Promise<ApiResponse<any>> {
     return this.patch(`/technicians/${id}/availability`);
+  }
+
+  // Customers specific methods
+  async getCustomers(params?: any): Promise<ApiResponse<any>> {
+    return this.get('/customers', params);
+  }
+
+  async getCustomer(id: string): Promise<ApiResponse<any>> {
+    return this.get(`/customers/${id}`);
+  }
+
+  async createCustomer(data: any): Promise<ApiResponse<any>> {
+    return this.post('/customers', data);
+  }
+
+  async updateCustomer(id: string, data: any): Promise<ApiResponse<any>> {
+    return this.put(`/customers/${id}`, data);
+  }
+
+  async deleteCustomer(id: string): Promise<ApiResponse<any>> {
+    return this.delete(`/customers/${id}`);
+  }
+
+  async toggleCustomerStatus(id: string): Promise<ApiResponse<any>> {
+    return this.patch(`/customers/${id}/status`);
+  }
+
+  // Customer Equipment methods
+  async getCustomerEquipment(customerId: string, params?: any): Promise<ApiResponse<any>> {
+    const queryParams = { ...params, customer_id: customerId };
+    return this.get('/equipment/customer-equipment', queryParams);
+  }
+
+  async getCustomerEquipmentById(id: string): Promise<ApiResponse<any>> {
+    return this.get(`/equipment/customer-equipment/${id}`);
+  }
+
+  async createCustomerEquipment(data: any): Promise<ApiResponse<any>> {
+    return this.post('/equipment/customer-equipment', data);
+  }
+
+  async updateCustomerEquipment(id: string, data: any): Promise<ApiResponse<any>> {
+    return this.put(`/equipment/customer-equipment/${id}`, data);
+  }
+
+  async deleteCustomerEquipment(id: string): Promise<ApiResponse<any>> {
+    return this.delete(`/equipment/customer-equipment/${id}`);
+  }
+
+  // Equipment Types methods
+  async getEquipmentTypes(params?: any): Promise<ApiResponse<any>> {
+    return this.get('/equipment/types', params);
+  }
+
+  async getEquipmentOptions(): Promise<ApiResponse<any>> {
+    return this.get('/equipment/options');
   }
 }
 

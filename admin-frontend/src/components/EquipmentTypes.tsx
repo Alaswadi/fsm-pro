@@ -267,6 +267,24 @@ const EquipmentTypes: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {state.equipmentTypes.map((equipmentType) => (
           <div key={equipmentType.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+            {/* Equipment Image */}
+            {equipmentType.image_url ? (
+              <div className="h-48 bg-gray-100">
+                <img
+                  src={equipmentType.image_url.startsWith('/uploads') ? `http://localhost:3001${equipmentType.image_url}` : equipmentType.image_url}
+                  alt={`${equipmentType.brand} ${equipmentType.model}`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="h-48 bg-gray-100 flex items-center justify-center">
+                <div className="text-center">
+                  <i className="ri-image-line text-4xl text-gray-400 mb-2"></i>
+                  <p className="text-sm text-gray-500">No image</p>
+                </div>
+              </div>
+            )}
+
             <div className="p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
@@ -406,6 +424,13 @@ const EquipmentTypes: React.FC = () => {
                     placeholder="Brief description of the equipment..."
                   />
                 </div>
+
+                {/* Image Upload */}
+                <ImageUpload
+                  currentImageUrl={formData.image_url}
+                  onImageUploaded={(imageUrl) => setFormData(prev => ({ ...prev, image_url: imageUrl }))}
+                  onImageRemoved={() => setFormData(prev => ({ ...prev, image_url: '' }))}
+                />
 
                 <div className="flex justify-end space-x-3 pt-4">
                   <button

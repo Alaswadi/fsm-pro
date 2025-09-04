@@ -95,6 +95,25 @@ CREATE TABLE customers (
     address TEXT NOT NULL,
     location_coordinates POINT,
     company_name VARCHAR(255),
+    industry VARCHAR(100), -- e.g., Healthcare, Education, Manufacturing
+    company_size VARCHAR(50), -- e.g., Small (1-50), Medium (51-200), Large (201+)
+    business_type VARCHAR(100), -- e.g., Corporation, LLC, Partnership, Non-profit
+    tax_id VARCHAR(50), -- Business tax identification number
+    website VARCHAR(255),
+    billing_address TEXT,
+    billing_contact_name VARCHAR(255),
+    billing_contact_email VARCHAR(255),
+    billing_contact_phone VARCHAR(20),
+    preferred_contact_method VARCHAR(50) DEFAULT 'phone', -- phone, email, whatsapp
+    service_tier VARCHAR(50) DEFAULT 'standard', -- basic, standard, premium
+    contract_type VARCHAR(50), -- one-time, monthly, annual, custom
+    contract_start_date DATE,
+    contract_end_date DATE,
+    payment_terms VARCHAR(100), -- Net 30, Net 15, COD, etc.
+    credit_limit DECIMAL(10,2),
+    discount_percentage DECIMAL(5,2) DEFAULT 0.00,
+    priority_level VARCHAR(20) DEFAULT 'normal', -- low, normal, high, critical
+    assigned_account_manager UUID REFERENCES users(id) ON DELETE SET NULL,
     notes TEXT,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

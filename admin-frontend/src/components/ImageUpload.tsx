@@ -47,20 +47,16 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     // Upload file
     try {
       setUploading(true);
-      
+
       const formData = new FormData();
       formData.append('image', file);
 
-      const response = await apiService.post<{
+      const response = await apiService.uploadFile<{
         imageUrl: string;
         filename: string;
         originalName: string;
         size: number;
-      }>('/upload/equipment-image', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      }>('/upload/equipment-image', formData);
 
       if (response.success && response.data) {
         onImageUploaded(response.data.imageUrl);

@@ -12,6 +12,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Technicians from './pages/Technicians';
+import Customers from './pages/Customers';
 import Equipment from './pages/Equipment';
 import Settings from './pages/Settings';
 
@@ -73,19 +74,8 @@ const App: React.FC = () => {
               />
               
               <Route path="technicians" element={<Technicians />} />
-              
-              <Route 
-                path="customers" 
-                element={
-                  <div className="p-6">
-                    <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 text-center">
-                      <i className="ri-group-line text-6xl text-gray-400 mb-4"></i>
-                      <h2 className="text-2xl font-bold text-gray-900 mb-2">Customers</h2>
-                      <p className="text-gray-600">Customers management page coming soon...</p>
-                    </div>
-                  </div>
-                } 
-              />
+
+              <Route path="customers" element={<Customers />} />
               
               <Route path="equipment" element={<Equipment />} />
 

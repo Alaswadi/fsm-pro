@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import authRoutes from './auth';
 import techniciansRoutes from './technicians';
+import customersRoutes from './customers';
 import settingsRoutes from './settings';
 import equipmentRoutes from './equipment';
 import uploadRoutes from './upload';
@@ -42,6 +43,7 @@ router.get('/health/db', async (req, res) => {
 // API routes
 router.use('/auth', authRoutes);
 router.use('/technicians', techniciansRoutes);
+router.use('/customers', customersRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/equipment', equipmentRoutes);
 router.use('/upload', uploadRoutes);

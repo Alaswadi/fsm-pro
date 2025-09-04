@@ -50,6 +50,25 @@ export interface Customer {
   address: string;
   location_coordinates?: { x: number; y: number };
   company_name?: string;
+  industry?: string;
+  company_size?: string;
+  business_type?: string;
+  tax_id?: string;
+  website?: string;
+  billing_address?: string;
+  billing_contact_name?: string;
+  billing_contact_email?: string;
+  billing_contact_phone?: string;
+  preferred_contact_method?: string;
+  service_tier?: string;
+  contract_type?: string;
+  contract_start_date?: string;
+  contract_end_date?: string;
+  payment_terms?: string;
+  credit_limit?: number;
+  discount_percentage?: number;
+  priority_level?: string;
+  assigned_account_manager?: string;
   notes?: string;
   is_active: boolean;
   created_at: string;
@@ -186,6 +205,16 @@ export interface DashboardStats {
 
 export interface TechniciansResponse {
   technicians: Technician[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface CustomersResponse {
+  customers: Customer[];
   pagination: {
     page: number;
     limit: number;
