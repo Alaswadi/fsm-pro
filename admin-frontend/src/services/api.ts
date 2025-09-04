@@ -34,12 +34,22 @@ class ApiService {
     this.api.interceptors.response.use(
       (response: AxiosResponse) => response,
       (error) => {
+        console.error('API Error:', error);
+
         if (error.response?.status === 401) {
           // Token expired or invalid
           localStorage.removeItem('fsm_token');
           localStorage.removeItem('fsm_user');
           window.location.href = '/login';
+        } else if (error.response?.status === 429) {
+          // Rate limit exceeded - don't logout, just show error
+          console.warn('Rate limit exceeded, please slow down requests');
+          // Don't redirect to login for rate limiting
+        } else if (error.code === 'ERR_NETWORK' || !error.response) {
+          // Network error or CORS issue
+          console.error('Network error or CORS issue:', error.message);
         }
+
         return Promise.reject(error);
       }
     );

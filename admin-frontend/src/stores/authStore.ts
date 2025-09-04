@@ -76,16 +76,16 @@ export const useAuthStore = create<AuthStore>()(
       checkAuth: async () => {
         try {
           const token = localStorage.getItem('fsm_token');
-          
+
           if (!token) {
             set({ isAuthenticated: false, isLoading: false });
             return;
           }
 
           set({ isLoading: true });
-          
+
           const response = await apiService.getProfile();
-          
+
           if (response.success && response.data) {
             set({
               user: response.data,
@@ -103,15 +103,36 @@ export const useAuthStore = create<AuthStore>()(
               isLoading: false,
             });
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Auth check error:', error);
-          localStorage.removeItem('fsm_token');
-          set({
-            user: null,
-            token: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
+
+          // Don't logout for rate limiting or network errors
+          if (error.response?.status === 429) {
+            console.warn('Rate limited during auth check, keeping user logged in');
+            set({ isLoading: false });
+            return;
+          }
+
+          // Don't logout for network/CORS errors
+          if (error.code === 'ERR_NETWORK' || !error.response) {
+            console.warn('Network error during auth check, keeping user logged in');
+            set({ isLoading: false });
+            return;
+          }
+
+          // Only logout for actual auth errors (401, 403)
+          if (error.response?.status === 401 || error.response?.status === 403) {
+            localStorage.removeItem('fsm_token');
+            set({
+              user: null,
+              token: null,
+              isAuthenticated: false,
+              isLoading: false,
+            });
+          } else {
+            // For other errors, keep user logged in but stop loading
+            set({ isLoading: false });
+          }
         }
       },
 

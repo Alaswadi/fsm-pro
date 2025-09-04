@@ -51,6 +51,11 @@ const CustomerEquipmentForm: React.FC<CustomerEquipmentFormProps> = ({
     loadEquipmentTypes();
   }, []);
 
+  // Update equipment state when initialEquipment prop changes
+  useEffect(() => {
+    setEquipment(initialEquipment);
+  }, [initialEquipment]);
+
   // Handle escape key to close modal
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

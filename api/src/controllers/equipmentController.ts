@@ -371,7 +371,6 @@ export const getCustomerEquipment = async (req: Request, res: Response) => {
         et.name as equipment_name,
         et.brand as equipment_brand,
         et.model as equipment_model,
-        et.category as equipment_category,
         row_to_json(c.*) as customer,
         row_to_json(et.*) as equipment_type
       FROM customer_equipment ce

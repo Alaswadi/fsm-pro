@@ -460,12 +460,16 @@ export const updateCustomer = async (req: Request, res: Response) => {
     // Clean assigned_account_manager field - set to null for now since frontend sends string
     const cleanAssignedAccountManager = null; // TODO: Implement user selection dropdown in frontend
 
+    // Clean date fields - convert empty strings to null for PostgreSQL
+    const cleanContractStartDate = contract_start_date && contract_start_date.trim() !== '' ? contract_start_date : null;
+    const cleanContractEndDate = contract_end_date && contract_end_date.trim() !== '' ? contract_end_date : null;
+
     const result = await query(updateQuery, [
       name, email, phone, whatsapp_number, address, company_name,
       industry, company_size, business_type, tax_id, website, billing_address,
       billing_contact_name, billing_contact_email, billing_contact_phone,
-      preferred_contact_method, service_tier, contract_type, contract_start_date,
-      contract_end_date, payment_terms, credit_limit, discount_percentage,
+      preferred_contact_method, service_tier, contract_type, cleanContractStartDate,
+      cleanContractEndDate, payment_terms, credit_limit, discount_percentage,
       priority_level, cleanAssignedAccountManager, notes, is_active, id, companyId
     ]);
 

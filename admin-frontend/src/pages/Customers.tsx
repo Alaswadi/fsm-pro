@@ -283,39 +283,46 @@ const Customers: React.FC = () => {
       }
 
       if (response.success) {
-        // Handle equipment for new customers
-        if (!state.editingCustomer && state.customerEquipment.length > 0 && customerId) {
+        // Handle equipment changes for both new and existing customers
+        if (state.customerEquipment.length > 0 && customerId) {
           try {
-            // Create equipment items for the new customer
-            const equipmentPromises = state.customerEquipment
-              .filter(equipment => equipment.id.startsWith('temp-')) // Only create new equipment items
-              .map(equipment => {
-                const { id, company_id, customer_id, equipment_type, ...equipmentData } = equipment;
-                return apiService.createCustomerEquipment({
-                  ...equipmentData,
-                  customer_id: customerId
+            // For new customers: create all equipment items
+            // For existing customers: equipment changes are already handled by the CustomerEquipmentForm component
+            if (!state.editingCustomer) {
+              // Create equipment items for the new customer
+              const equipmentPromises = state.customerEquipment
+                .filter(equipment => equipment.id.startsWith('temp-')) // Only create new equipment items
+                .map(equipment => {
+                  const { id, company_id, customer_id, equipment_type, ...equipmentData } = equipment;
+                  return apiService.createCustomerEquipment({
+                    ...equipmentData,
+                    customer_id: customerId
+                  });
                 });
-              });
 
-            const equipmentResults = await Promise.allSettled(equipmentPromises);
+              const equipmentResults = await Promise.allSettled(equipmentPromises);
 
-            // Check if any equipment creation failed
-            const failedEquipment = equipmentResults.filter(result =>
-              result.status === 'rejected' ||
-              (result.status === 'fulfilled' && !result.value.success)
-            );
+              // Check if any equipment creation failed
+              const failedEquipment = equipmentResults.filter(result =>
+                result.status === 'rejected' ||
+                (result.status === 'fulfilled' && !result.value.success)
+              );
 
-            if (failedEquipment.length > 0) {
-              console.warn('Some equipment items failed to create:', failedEquipment);
-              toast.error(`Customer created successfully, but ${failedEquipment.length} equipment item(s) failed to save`);
-            } else if (equipmentPromises.length > 0) {
-              toast.success(`Customer and ${equipmentPromises.length} equipment item(s) created successfully`);
+              if (failedEquipment.length > 0) {
+                console.warn('Some equipment items failed to create:', failedEquipment);
+                toast.error(`Customer created successfully, but ${failedEquipment.length} equipment item(s) failed to save`);
+              } else if (equipmentPromises.length > 0) {
+                toast.success(`Customer and ${equipmentPromises.length} equipment item(s) created successfully`);
+              } else {
+                toast.success(response.message || 'Customer created successfully');
+              }
             } else {
-              toast.success(response.message || 'Customer created successfully');
+              // For existing customers, equipment changes are handled by the CustomerEquipmentForm component
+              toast.success(response.message || 'Customer updated successfully');
             }
           } catch (equipmentError) {
-            console.error('Error creating equipment:', equipmentError);
-            toast.error('Customer created successfully, but equipment creation failed');
+            console.error('Error handling equipment:', equipmentError);
+            toast.error(`Customer ${state.editingCustomer ? 'updated' : 'created'} successfully, but equipment changes failed`);
           }
         } else {
           toast.success(response.message || `Customer ${state.editingCustomer ? 'updated' : 'created'} successfully`);
