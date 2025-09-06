@@ -1,0 +1,177 @@
+<html><head>
+<meta charset="utf-8"/>
+<link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+<link as="style" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900&amp;family=Plus+Jakarta+Sans%3Awght%40400%3B500%3B700%3B800" onload="this.rel='stylesheet'" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<title>Stitch Design</title>
+<link href="data:image/x-icon;base64," rel="icon" type="image/x-icon"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style type="text/tailwindcss">
+      :root {
+        --primary-color: #ea2a33;
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-gray-50">
+<div class="relative flex size-full min-h-screen flex-col bg-white justify-between group/design-root overflow-x-hidden" style='font-family: "Plus Jakarta Sans", "Noto Sans", sans-serif;'>
+<div class="flex flex-col bg-gray-50">
+<header class="bg-white sticky top-0 z-10 shadow-sm">
+<div class="flex items-center p-4 pb-2 justify-between">
+<h2 class="text-gray-900 text-xl font-bold leading-tight tracking-tight flex-1 text-center">Inventory</h2>
+</div>
+<div class="px-4 py-3 flex items-center gap-2">
+<div class="relative flex-grow">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"> search </span>
+<input class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-gray-900 focus:outline-0 focus:ring-2 focus:ring-[var(--primary-color)] focus:ring-opacity-50 border-gray-300 bg-white h-12 placeholder:text-gray-400 pl-10 pr-4 text-base font-normal leading-normal" placeholder="Search parts by name or number" value=""/>
+</div>
+<button class="flex-shrink-0 flex max-w-[48px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 w-12 bg-[var(--primary-color)] text-white gap-2 text-base font-bold leading-normal tracking-[0.015em] min-w-0 p-0">
+<span class="material-symbols-outlined"> qr_code_scanner </span>
+</button>
+</div>
+<div class="flex gap-2 p-3 pb-4 overflow-x-auto">
+<div class="flex h-8 shrink-0 cursor-pointer items-center justify-center gap-x-2 rounded-full bg-gray-100 px-4 hover:bg-gray-200">
+<p class="text-gray-800 text-sm font-medium leading-normal">Recent</p>
+</div>
+<div class="flex h-8 shrink-0 cursor-pointer items-center justify-center gap-x-2 rounded-full bg-gray-100 px-4 hover:bg-gray-200">
+<p class="text-gray-800 text-sm font-medium leading-normal">Low Stock</p>
+</div>
+<div class="flex h-8 shrink-0 cursor-pointer items-center justify-center gap-x-2 rounded-full bg-gray-100 px-4 hover:bg-gray-200">
+<p class="text-gray-800 text-sm font-medium leading-normal">Nearby</p>
+</div>
+</div>
+</header>
+<main class="flex-grow p-4 space-y-4">
+<div class="bg-white rounded-lg shadow-sm p-4">
+<div class="flex items-center justify-between gap-4">
+<img alt="Circuit Breaker" class="w-20 h-20 bg-center bg-no-repeat bg-cover rounded-md object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCth6pTUjpMJo7L8hJyb8LJJMRksZiDL3eRUWU4kfIZb2qPoa7gEJP7rB7G-57pEEsX_k3zRtrk3eidl7cF3-sS44SpiOuzyA3RmUOOtMCO7_ODPrmH7lwKpmC7VAWQVSn-K39wFrbJ5ESpDsFfMNaf8-N2FGEEICBNfcqU7zN4PceyiuuJ1V8Fc6OA_mpuIOKiCkOXiXeo8Kie8uR5vbFCY1rlskftP1zfD8EhigzPsi0iGNfODWZtYAUf6eMXLxvVpj531EUEZWI"/>
+<div class="flex-grow">
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"> Low Stock </span>
+</div>
+<p class="text-gray-800 text-base font-bold leading-tight mt-1">Part #12345</p>
+<p class="text-gray-500 text-sm font-normal leading-normal">Circuit Breaker</p>
+<p class="text-gray-800 text-sm font-medium mt-1">Quantity: 2</p>
+</div>
+<div class="flex flex-col items-center gap-2">
+<button class="w-8 h-8 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center text-lg">+</button>
+<button class="w-8 h-8 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center text-lg">-</button>
+</div>
+</div>
+</div>
+<div class="bg-white rounded-lg shadow-sm p-4">
+<div class="flex items-center justify-between gap-4">
+<img alt="HVAC Filter" class="w-20 h-20 bg-center bg-no-repeat bg-cover rounded-md object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC9amUTLjn7NBN7-oWV-EMJ-3lvPmbBCz_gV_o9j0BGkmlsMXQkk7qnkr110aEix1TqzEvyFrBagqWb1FRr2YLqNgBH6LcdNI2PhSkXkAJRflGlostb5GN8j2kfqA8QqoBSCAMDHdMzamkITxwQqxBEkFxwTsbQpjlgQNIoRXG70u6K9NGWrFN06N9FOZrodNDNCopcBiWlpzhl206udKGs2L1ppoi64UBuE6OkM1OHc_ozFHlHMl-HhrBTyfWbCSFU6stlYhN2Vg0"/>
+<div class="flex-grow">
+<p class="text-gray-800 text-base font-bold leading-tight">Part #67890</p>
+<p class="text-gray-500 text-sm font-normal leading-normal">HVAC Filter</p>
+<p class="text-gray-800 text-sm font-medium mt-1">Quantity: 15</p>
+</div>
+<div class="flex flex-col items-center gap-2">
+<button class="w-8 h-8 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center text-lg">+</button>
+<button class="w-8 h-8 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center text-lg">-</button>
+</div>
+</div>
+</div>
+<div class="bg-white rounded-lg shadow-sm p-4">
+<div class="flex items-center justify-between gap-4">
+<img alt="Electrical Wire" class="w-20 h-20 bg-center bg-no-repeat bg-cover rounded-md object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCGlLCh37IuGg355djHUWmlc6wuAqzmVZqlQvG_Eb5baTNjhjVVKqH772vlTASyU9dHFbMAlIjxkoOlpc-BtpXN6wYEVI5IdJnfaJ5zDFWJJ9MTJKTanvsj_cWitunDmq3d32Dud4G2JXh7kPOd8ulM7t8psv5SRplWFuGCO2MPrE18KPzdd_idOdtn2dDo4dIccwQkc8Vy2YgvJoKlEdva-TSTJug1K6NBwuHsS2FyURgrBAX0UX205beJ1uOmgD6gvj476P-Aq2I"/>
+<div class="flex-grow">
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"> Low Stock </span>
+</div>
+<p class="text-gray-800 text-base font-bold leading-tight mt-1">Part #11223</p>
+<p class="text-gray-500 text-sm font-normal leading-normal">Electrical Wire</p>
+<p class="text-gray-800 text-sm font-medium mt-1">Quantity: 5</p>
+</div>
+<div class="flex flex-col items-center gap-2">
+<button class="w-8 h-8 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center text-lg">+</button>
+<button class="w-8 h-8 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center text-lg">-</button>
+</div>
+</div>
+</div>
+<div class="bg-white rounded-lg shadow-sm p-4">
+<div class="flex items-center justify-between gap-4">
+<img alt="Plumbing Valve" class="w-20 h-20 bg-center bg-no-repeat bg-cover rounded-md object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCi-U_9-SfMtHcdlbu0OIKEgTniPjCdaUQwImdLDuCggNe5cDGgnfdSkkXCwHxs4_DwlVPUA3qi3AnCyBPYFGagg_Ww9GaOTr0dKcgjYJddqCjKuJds38pxiAWY84e7mZNNDTPEGT7txzKHoWYLrbNahGzTyJ5X7TTpfEs5T1Lmr67ZZlXqPX90770ELSsy9mfrQmtDDc6HDmFn6gRfCIGvMZNhslY-1wWNr54npEortL-JsE7CdVhby9Dl1gJ6ihUP-gl4hyao1uQ"/>
+<div class="flex-grow">
+<p class="text-gray-800 text-base font-bold leading-tight">Part #44556</p>
+<p class="text-gray-500 text-sm font-normal leading-normal">Plumbing Valve</p>
+<p class="text-gray-800 text-sm font-medium mt-1">Quantity: 20</p>
+</div>
+<div class="flex flex-col items-center gap-2">
+<button class="w-8 h-8 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center text-lg">+</button>
+<button class="w-8 h-8 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center text-lg">-</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+<footer class="sticky bottom-0 bg-white border-t border-gray-200">
+<div class="flex justify-around items-center pt-2 pb-3">
+<a class="flex flex-col items-center justify-center gap-1 text-gray-500 hover:text-[var(--primary-color)] w-1/4" href="#">
+<span class="material-symbols-outlined"> list_alt </span>
+<p class="text-xs font-medium">Work Orders</p>
+</a>
+<a class="flex flex-col items-center justify-center gap-1 text-gray-500 hover:text-[var(--primary-color)] w-1/4" href="#">
+<span class="material-symbols-outlined"> calendar_today </span>
+<p class="text-xs font-medium">Schedule</p>
+</a>
+<a class="flex flex-col items-center justify-center gap-1 text-[var(--primary-color)] w-1/4" href="#">
+<span class="material-symbols-outlined"> inventory_2 </span>
+<p class="text-xs font-bold">Inventory</p>
+</a>
+<a class="flex flex-col items-center justify-center gap-1 text-gray-500 hover:text-[var(--primary-color)] w-1/4" href="#">
+<span class="material-symbols-outlined"> person </span>
+<p class="text-xs font-medium">Profile</p>
+</a>
+</div>
+</footer>
+<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20 hidden" id="part-detail-modal">
+<div class="bg-white rounded-lg shadow-xl w-11/12 max-w-md mx-auto">
+<div class="p-4 border-b">
+<h3 class="text-lg font-bold text-gray-900">Part Detail</h3>
+</div>
+<div class="p-4 space-y-4">
+<div>
+<p class="text-sm text-gray-500">Part Number</p>
+<p class="text-base font-semibold text-gray-800">#12345</p>
+</div>
+<div>
+<p class="text-sm text-gray-500">Description</p>
+<p class="text-base font-semibold text-gray-800">Circuit Breaker</p>
+</div>
+<div class="grid grid-cols-3 gap-4">
+<div>
+<p class="text-sm text-gray-500">Current</p>
+<p class="text-base font-semibold text-gray-800">2</p>
+</div>
+<div>
+<p class="text-sm text-gray-500">Min</p>
+<p class="text-base font-semibold text-red-600">5</p>
+</div>
+<div>
+<p class="text-sm text-gray-500">Location</p>
+<p class="text-base font-semibold text-gray-800">Van A-12</p>
+</div>
+</div>
+<div>
+<p class="text-sm text-gray-500 mb-2">Usage History</p>
+<ul class="space-y-2 text-sm text-gray-700">
+<li class="flex justify-between"><span>WO-001</span><span>-1</span></li>
+<li class="flex justify-between"><span>WO-003</span><span>-2</span></li>
+</ul>
+</div>
+</div>
+<div class="p-4 bg-gray-50 border-t flex justify-end gap-2">
+<button class="px-4 py-2 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300 font-semibold" onclick="document.getElementById('part-detail-modal').classList.add('hidden')">Close</button>
+<button class="px-4 py-2 rounded-md text-white bg-[var(--primary-color)] hover:bg-opacity-90 font-semibold">Request More</button>
+</div>
+</div>
+</div>
+</div>
+
+</body></html>
