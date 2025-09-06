@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { query } from '../config/database';
-import { ApiResponse, EquipmentType, CustomerEquipment, EquipmentInventoryCompatibility } from '../types';
+import { ApiResponse, EquipmentType, CustomerEquipment } from '../types';
 
 // Equipment Types Controllers
 
@@ -728,7 +728,8 @@ export const deleteCustomerEquipment = async (req: Request, res: Response) => {
 // Get equipment options for forms (customers and equipment types)
 export const getEquipmentOptions = async (req: Request, res: Response) => {
   try {
-    // Get equipment types
+
+    // Get equipment types (shared across all companies)
     const equipmentTypesQuery = `
       SELECT id, name, brand, model
       FROM equipment_types
@@ -750,9 +751,7 @@ export const getEquipmentOptions = async (req: Request, res: Response) => {
       data: {
         customers: [],
         equipment_types: equipmentTypesResult.rows,
-        categories: [],
-        brands: brandsResult.rows.map(row => row.brand),
-        parts: []
+        brands: brandsResult.rows.map(row => row.brand)
       }
     } as ApiResponse);
 
@@ -765,171 +764,8 @@ export const getEquipmentOptions = async (req: Request, res: Response) => {
   }
 };
 
-// Equipment-Inventory Compatibility Controllers
 
-// Get compatibility relationships for an equipment type
-export const getEquipmentCompatibility = async (req: Request, res: Response) => {
-  try {
-    const { equipment_type_id } = req.params;
-    const companyId = req.company?.id;
 
-    if (!companyId) {
-      return res.status(403).json({
-        success: false,
-        error: 'No company context found'
-      } as ApiResponse);
-    }
 
-    const compatibilityQuery = `
-      SELECT
-        eic.*,
-        row_to_json(et.*) as equipment_type,
-        row_to_json(p.*) as part
-      FROM equipment_inventory_compatibility eic
-      LEFT JOIN equipment_types et ON eic.equipment_type_id = et.id
-      LEFT JOIN parts p ON eic.part_id = p.id
-      WHERE eic.equipment_type_id = $1 AND et.company_id = $2
-      ORDER BY eic.compatibility_type, p.name
-    `;
 
-    const result = await query(compatibilityQuery, [equipment_type_id, companyId]);
 
-    res.json({
-      success: true,
-      data: {
-        compatibility: result.rows
-      }
-    } as ApiResponse);
-
-  } catch (error) {
-    console.error('Error fetching equipment compatibility:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch equipment compatibility'
-    } as ApiResponse);
-  }
-};
-
-// Add compatibility relationship
-export const addEquipmentCompatibility = async (req: Request, res: Response) => {
-  try {
-    const {
-      equipment_type_id,
-      part_id,
-      compatibility_type = 'compatible',
-      usage_notes
-    } = req.body;
-
-    const companyId = req.company?.id;
-
-    // Validation
-    if (!equipment_type_id || !part_id) {
-      return res.status(400).json({
-        success: false,
-        error: 'Equipment type and part are required'
-      } as ApiResponse);
-    }
-
-    // Verify equipment type exists
-    const equipmentTypeQuery = `SELECT id FROM equipment_types WHERE id = $1`;
-    const equipmentTypeResult = await query(equipmentTypeQuery, [equipment_type_id]);
-
-    if (equipmentTypeResult.rows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Equipment type not found'
-      } as ApiResponse);
-    }
-
-    const partQuery = `SELECT id FROM parts WHERE id = $1 AND company_id = $2`;
-    const partResult = await query(partQuery, [part_id, companyId]);
-
-    if (partResult.rows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Part not found'
-      } as ApiResponse);
-    }
-
-    // Check if compatibility already exists
-    const existingQuery = `
-      SELECT id FROM equipment_inventory_compatibility
-      WHERE equipment_type_id = $1 AND part_id = $2
-    `;
-    const existingResult = await query(existingQuery, [equipment_type_id, part_id]);
-
-    if (existingResult.rows.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Compatibility relationship already exists'
-      } as ApiResponse);
-    }
-
-    const insertQuery = `
-      INSERT INTO equipment_inventory_compatibility (
-        equipment_type_id, part_id, compatibility_type, usage_notes
-      ) VALUES ($1, $2, $3, $4)
-      RETURNING *
-    `;
-
-    const result = await query(insertQuery, [
-      equipment_type_id, part_id, compatibility_type, usage_notes
-    ]);
-
-    res.status(201).json({
-      success: true,
-      data: result.rows[0],
-      message: 'Compatibility relationship created successfully'
-    } as ApiResponse);
-
-  } catch (error) {
-    console.error('Error creating equipment compatibility:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to create equipment compatibility'
-    } as ApiResponse);
-  }
-};
-
-// Remove compatibility relationship
-export const removeEquipmentCompatibility = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const companyId = req.company?.id;
-
-    // Verify compatibility exists and belongs to company equipment
-    const compatibilityQuery = `
-      SELECT eic.id
-      FROM equipment_inventory_compatibility eic
-      JOIN equipment_types et ON eic.equipment_type_id = et.id
-      WHERE eic.id = $1 AND et.company_id = $2
-    `;
-    const compatibilityResult = await query(compatibilityQuery, [id, companyId]);
-
-    if (compatibilityResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Compatibility relationship not found'
-      } as ApiResponse);
-    }
-
-    const deleteQuery = `
-      DELETE FROM equipment_inventory_compatibility
-      WHERE id = $1
-    `;
-
-    await query(deleteQuery, [id]);
-
-    res.json({
-      success: true,
-      message: 'Compatibility relationship removed successfully'
-    } as ApiResponse);
-
-  } catch (error) {
-    console.error('Error removing equipment compatibility:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to remove equipment compatibility'
-    } as ApiResponse);
-  }
-};

@@ -14,7 +14,9 @@ import Dashboard from './pages/Dashboard';
 import Technicians from './pages/Technicians';
 import Customers from './pages/Customers';
 import Equipment from './pages/Equipment';
+import Inventory from './pages/Inventory';
 import Settings from './pages/Settings';
+import WorkOrders from './pages/WorkOrders';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -58,20 +60,7 @@ const App: React.FC = () => {
             >
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
-              
-              {/* Placeholder routes for future pages */}
-              <Route 
-                path="work-orders" 
-                element={
-                  <div className="p-6">
-                    <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 text-center">
-                      <i className="ri-file-list-line text-6xl text-gray-400 mb-4"></i>
-                      <h2 className="text-2xl font-bold text-gray-900 mb-2">Work Orders</h2>
-                      <p className="text-gray-600">Work Orders management page coming soon...</p>
-                    </div>
-                  </div>
-                } 
-              />
+              <Route path="work-orders" element={<WorkOrders />} />
               
               <Route path="technicians" element={<Technicians />} />
 
@@ -79,18 +68,7 @@ const App: React.FC = () => {
               
               <Route path="equipment" element={<Equipment />} />
 
-              <Route
-                path="inventory"
-                element={
-                  <div className="p-6">
-                    <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 text-center">
-                      <i className="ri-box-line text-6xl text-gray-400 mb-4"></i>
-                      <h2 className="text-2xl font-bold text-gray-900 mb-2">Inventory</h2>
-                      <p className="text-gray-600">Inventory management page coming soon...</p>
-                    </div>
-                  </div>
-                }
-              />
+              <Route path="inventory" element={<Inventory />} />
               
               <Route 
                 path="analytics" 

@@ -4,7 +4,10 @@ import techniciansRoutes from './technicians';
 import customersRoutes from './customers';
 import settingsRoutes from './settings';
 import equipmentRoutes from './equipment';
+import inventoryRoutes from './inventory';
 import uploadRoutes from './upload';
+import jobsRoutes from './jobs';
+import dashboardRoutes from './dashboard';
 import { query } from '../config/database';
 
 const router = Router();
@@ -42,10 +45,13 @@ router.get('/health/db', async (req, res) => {
 
 // API routes
 router.use('/auth', authRoutes);
+router.use('/dashboard', dashboardRoutes);
 router.use('/technicians', techniciansRoutes);
 router.use('/customers', customersRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/equipment', equipmentRoutes);
+router.use('/inventory', inventoryRoutes);
 router.use('/upload', uploadRoutes);
+router.use('/jobs', jobsRoutes);
 
 export default router;

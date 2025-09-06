@@ -199,6 +199,61 @@ class ApiService {
   async getEquipmentOptions(): Promise<ApiResponse<any>> {
     return this.get('/equipment/options');
   }
+
+  // Jobs/Work Orders specific methods
+  async getJobs(params?: any): Promise<ApiResponse<any>> {
+    return this.get('/jobs', params);
+  }
+
+  async getJob(id: string): Promise<ApiResponse<any>> {
+    return this.get(`/jobs/${id}`);
+  }
+
+  async createJob(data: any): Promise<ApiResponse<any>> {
+    return this.post('/jobs', data);
+  }
+
+  async updateJob(id: string, data: any): Promise<ApiResponse<any>> {
+    return this.put(`/jobs/${id}`, data);
+  }
+
+  async deleteJob(id: string): Promise<ApiResponse<any>> {
+    return this.delete(`/jobs/${id}`);
+  }
+
+  async updateJobStatus(id: string, status: string): Promise<ApiResponse<any>> {
+    return this.patch(`/jobs/${id}/status`, { status });
+  }
+
+  async getJobOptions(): Promise<ApiResponse<any>> {
+    return this.get('/jobs/options');
+  }
+
+  async getCustomerEquipmentForJob(customerId: string): Promise<ApiResponse<any>> {
+    return this.get(`/jobs/customer/${customerId}/equipment`);
+  }
+
+  // Search methods for job forms
+  async searchTechnicians(search?: string): Promise<ApiResponse<any>> {
+    return this.get('/jobs/search/technicians', { search, _t: Date.now() });
+  }
+
+  async searchCustomers(search?: string): Promise<ApiResponse<any>> {
+    return this.get('/jobs/search/customers', { search });
+  }
+
+  async searchEquipment(search?: string, customerId?: string): Promise<ApiResponse<any>> {
+    return this.get('/jobs/search/equipment', { search, customer_id: customerId });
+  }
+
+  // Dashboard specific methods
+  async getDashboardStats(): Promise<ApiResponse<any>> {
+    return this.get('/dashboard/stats');
+  }
+
+  async getRecentActivities(limit?: number): Promise<ApiResponse<any>> {
+    return this.get('/dashboard/activities', { limit });
+  }
 }
 
 export const apiService = new ApiService();

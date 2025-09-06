@@ -1,65 +1,106 @@
-import React, { useEffect, useState } from 'react';
-import { DashboardStats } from '../types';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { DashboardStats, LowStockAlertsResponse, RecentActivity } from '../types';
+import { apiService } from '../services/api';
 
 const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
-    activeWorkOrders: 247,
-    availableTechnicians: 18,
-    completionRate: 94.2,
-    monthlyRevenue: 84200,
-    workOrderTrend: 12,
+    activeWorkOrders: 0,
+    availableTechnicians: 0,
+    totalCustomers: 0,
+    totalEquipment: 0,
+    completionRate: 0,
+    monthlyRevenue: 0,
+    workOrderTrend: 0,
     technicianTrend: 0,
-    completionTrend: 2.1,
-    revenueTrend: 8.5,
+    completionTrend: 0,
+    revenueTrend: 0,
+    overdueWorkOrders: 0,
+    equipmentNeedingMaintenance: 0,
   });
 
-  const [recentActivities] = useState([
-    {
-      id: 1,
-      type: 'completed',
-      icon: 'ri-check-line',
-      iconBg: 'bg-green-100',
-      iconColor: 'text-green-600',
-      title: 'Work Order #WO-2024-1247 completed',
-      subtitle: 'Technician: Michael Rodriguez • 15 minutes ago',
-    },
-    {
-      id: 2,
-      type: 'created',
-      icon: 'ri-add-line',
-      iconBg: 'bg-blue-100',
-      iconColor: 'text-blue-600',
-      title: 'New work order created for Johnson Manufacturing',
-      subtitle: 'Priority: High • 32 minutes ago',
-    },
-    {
-      id: 3,
-      type: 'alert',
-      icon: 'ri-alert-line',
-      iconBg: 'bg-orange-100',
-      iconColor: 'text-orange-600',
-      title: 'Low inventory alert: Hydraulic pump seals',
-      subtitle: 'Only 3 units remaining • 1 hour ago',
-    },
-    {
-      id: 4,
-      type: 'assigned',
-      icon: 'ri-user-add-line',
-      iconBg: 'bg-purple-100',
-      iconColor: 'text-purple-600',
-      title: 'New technician Sarah Chen assigned to North Region',
-      subtitle: 'Specialization: HVAC Systems • 2 hours ago',
-    },
-    {
-      id: 5,
-      type: 'feedback',
-      icon: 'ri-star-line',
-      iconBg: 'bg-green-100',
-      iconColor: 'text-green-600',
-      title: 'Customer feedback received: 5-star rating',
-      subtitle: 'Atlantic Industries • 3 hours ago',
-    },
-  ]);
+  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
+  const [lowStockAlerts, setLowStockAlerts] = useState<LowStockAlertsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [inventoryLoading, setInventoryLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [systemStatus, setSystemStatus] = useState<'healthy' | 'warning' | 'error'>('healthy');
+
+  const loadDashboardData = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      // Load dashboard stats
+      const statsResponse = await apiService.getDashboardStats();
+      if (statsResponse.success && statsResponse.data) {
+        setStats(statsResponse.data);
+      }
+
+      // Load recent activities
+      const activitiesResponse = await apiService.getRecentActivities(5);
+      if (activitiesResponse.success && activitiesResponse.data) {
+        setRecentActivities(activitiesResponse.data);
+      }
+
+      setLastUpdated(new Date());
+      setSystemStatus('healthy');
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      setSystemStatus('error');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadInventoryAlerts = useCallback(async () => {
+    try {
+      setInventoryLoading(true);
+
+      // Load low stock alerts
+      const alertsResponse = await apiService.get<LowStockAlertsResponse>('/inventory/alerts');
+      if (alertsResponse.success && alertsResponse.data) {
+        setLowStockAlerts(alertsResponse.data);
+      }
+    } catch (error) {
+      console.error('Error loading inventory alerts:', error);
+    } finally {
+      setInventoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDashboardData();
+    loadInventoryAlerts();
+  }, [loadDashboardData, loadInventoryAlerts]);
+
+  useEffect(() => {
+    if (autoRefresh) {
+      const dashboardInterval = setInterval(loadDashboardData, 5 * 60 * 1000); // 5 minutes
+      const inventoryInterval = setInterval(loadInventoryAlerts, 5 * 60 * 1000); // 5 minutes
+      setRefreshInterval(dashboardInterval);
+
+      return () => {
+        clearInterval(dashboardInterval);
+        clearInterval(inventoryInterval);
+      };
+    } else if (refreshInterval) {
+      clearInterval(refreshInterval);
+      setRefreshInterval(null);
+    }
+  }, [autoRefresh, loadDashboardData, loadInventoryAlerts]);
+
+  const toggleAutoRefresh = () => {
+    setAutoRefresh(!autoRefresh);
+  };
+
+  // Manual refresh function
+  const handleRefresh = () => {
+    loadDashboardData();
+    loadInventoryAlerts();
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -81,8 +122,52 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="p-6">
+      {/* Header with refresh controls */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <div className="flex items-center space-x-4 text-sm text-gray-600">
+            <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
+            {autoRefresh && <span className="text-green-600">• Auto-refresh enabled</span>}
+            <div className="flex items-center space-x-1">
+              <div className={`w-2 h-2 rounded-full ${
+                systemStatus === 'healthy' ? 'bg-green-500' :
+                systemStatus === 'warning' ? 'bg-yellow-500' : 'bg-red-500'
+              }`}></div>
+              <span className={
+                systemStatus === 'healthy' ? 'text-green-600' :
+                systemStatus === 'warning' ? 'text-yellow-600' : 'text-red-600'
+              }>
+                System {systemStatus === 'healthy' ? 'Healthy' : systemStatus === 'warning' ? 'Warning' : 'Error'}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={toggleAutoRefresh}
+            className={`flex items-center space-x-2 px-3 py-2 rounded-lg border transition-colors ${
+              autoRefresh
+                ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <i className={`ri-time-line ${autoRefresh ? 'text-green-600' : 'text-gray-500'}`}></i>
+            <span className="text-sm">Auto-refresh</span>
+          </button>
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="flex items-center space-x-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <i className={`ri-refresh-line ${loading ? 'animate-spin' : ''}`}></i>
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
         {/* Active Work Orders */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between">
@@ -135,6 +220,47 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* Total Customers */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Customers</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{stats.totalCustomers}</p>
+              <p className="text-sm mt-2 text-gray-500">Active customers</p>
+            </div>
+            <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <div className="w-6 h-6 flex items-center justify-center text-indigo-600">
+                <i className="ri-user-line"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Total Equipment */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Equipment</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{stats.totalEquipment}</p>
+              <p className="text-sm mt-2 text-gray-500">
+                {stats.equipmentNeedingMaintenance > 0 && (
+                  <span className="text-orange-600">
+                    {stats.equipmentNeedingMaintenance} need maintenance
+                  </span>
+                )}
+                {stats.equipmentNeedingMaintenance === 0 && (
+                  <span className="text-green-600">All up to date</span>
+                )}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
+              <div className="w-6 h-6 flex items-center justify-center text-teal-600">
+                <i className="ri-tools-line"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Revenue This Month */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between">
@@ -151,6 +277,115 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Alerts Section */}
+      {(stats.overdueWorkOrders > 0 || stats.equipmentNeedingMaintenance > 0) && (
+        <div className="mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {stats.overdueWorkOrders > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                    <i className="ri-alert-line text-red-600"></i>
+                  </div>
+                  <div className="ml-3">
+                    <h4 className="text-sm font-medium text-red-800">
+                      {stats.overdueWorkOrders} Overdue Work Orders
+                    </h4>
+                    <p className="text-xs text-red-600">Require immediate attention</p>
+                  </div>
+                  <button
+                    onClick={() => navigate('/work-orders?status=overdue')}
+                    className="ml-auto text-xs text-red-700 hover:text-red-800 font-medium"
+                  >
+                    View →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {stats.equipmentNeedingMaintenance > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                    <i className="ri-tools-line text-orange-600"></i>
+                  </div>
+                  <div className="ml-3">
+                    <h4 className="text-sm font-medium text-orange-800">
+                      {stats.equipmentNeedingMaintenance} Equipment Need Maintenance
+                    </h4>
+                    <p className="text-xs text-orange-600">Schedule maintenance soon</p>
+                  </div>
+                  <button
+                    onClick={() => navigate('/equipment?filter=maintenance')}
+                    className="ml-auto text-xs text-orange-700 hover:text-orange-800 font-medium"
+                  >
+                    View →
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <button
+            onClick={() => navigate('/work-orders/new')}
+            className="flex items-center p-4 bg-white rounded-xl border border-gray-100 hover:border-blue-200 hover:bg-blue-50 transition-colors group"
+          >
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200">
+              <i className="ri-add-line text-blue-600"></i>
+            </div>
+            <div className="ml-3 text-left">
+              <p className="text-sm font-medium text-gray-900">New Work Order</p>
+              <p className="text-xs text-gray-500">Create work order</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/customers/new')}
+            className="flex items-center p-4 bg-white rounded-xl border border-gray-100 hover:border-green-200 hover:bg-green-50 transition-colors group"
+          >
+            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200">
+              <i className="ri-user-add-line text-green-600"></i>
+            </div>
+            <div className="ml-3 text-left">
+              <p className="text-sm font-medium text-gray-900">Add Customer</p>
+              <p className="text-xs text-gray-500">Register new customer</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/technicians')}
+            className="flex items-center p-4 bg-white rounded-xl border border-gray-100 hover:border-purple-200 hover:bg-purple-50 transition-colors group"
+          >
+            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-200">
+              <i className="ri-user-settings-line text-purple-600"></i>
+            </div>
+            <div className="ml-3 text-left">
+              <p className="text-sm font-medium text-gray-900">Manage Technicians</p>
+              <p className="text-xs text-gray-500">View availability</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/work-orders?priority=urgent')}
+            className="flex items-center p-4 bg-white rounded-xl border border-gray-100 hover:border-red-200 hover:bg-red-50 transition-colors group"
+          >
+            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200">
+              <i className="ri-alarm-warning-line text-red-600"></i>
+            </div>
+            <div className="ml-3 text-left">
+              <p className="text-sm font-medium text-gray-900">Urgent Tasks</p>
+              <p className="text-xs text-gray-500">High priority items</p>
+            </div>
+          </button>
         </div>
       </div>
 
@@ -184,8 +419,22 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
             <div className="absolute top-4 left-4 bg-white rounded-lg p-3 shadow-sm">
-              <p className="text-sm font-medium text-gray-900">18 Active Technicians</p>
-              <p className="text-xs text-gray-500">Last updated 2 min ago</p>
+              <p className="text-sm font-medium text-gray-900">{stats.availableTechnicians} Available Technicians</p>
+              <p className="text-xs text-gray-500">Last updated {lastUpdated.toLocaleTimeString()}</p>
+            </div>
+
+            {/* Status indicators */}
+            <div className="absolute bottom-4 left-4 space-y-2">
+              <div className="flex items-center space-x-2 bg-white rounded-lg px-3 py-2 shadow-sm">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-xs text-gray-600">{stats.availableTechnicians} Available</span>
+              </div>
+              {stats.overdueWorkOrders > 0 && (
+                <div className="flex items-center space-x-2 bg-white rounded-lg px-3 py-2 shadow-sm">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <span className="text-xs text-gray-600">{stats.overdueWorkOrders} Overdue</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -200,19 +449,30 @@ const Dashboard: React.FC = () => {
             <button className="text-sm text-primary hover:text-blue-700">View All</button>
           </div>
           <div className="space-y-4">
-            {recentActivities.map((activity) => (
-              <div key={activity.id} className="flex items-start space-x-4">
-                <div className={`w-8 h-8 ${activity.iconBg} rounded-full flex items-center justify-center flex-shrink-0`}>
-                  <div className={`w-4 h-4 flex items-center justify-center ${activity.iconColor}`}>
-                    <i className={activity.icon}></i>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+              </div>
+            ) : recentActivities.length > 0 ? (
+              recentActivities.map((activity) => (
+                <div key={activity.id} className="flex items-start space-x-4">
+                  <div className={`w-8 h-8 ${activity.iconBg} rounded-full flex items-center justify-center flex-shrink-0`}>
+                    <div className={`w-4 h-4 flex items-center justify-center ${activity.iconColor}`}>
+                      <i className={activity.icon}></i>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">{activity.title}</p>
+                    <p className="text-xs text-gray-500">{activity.subtitle} • {activity.relativeTime}</p>
                   </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{activity.title}</p>
-                  <p className="text-xs text-gray-500">{activity.subtitle}</p>
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <i className="ri-history-line text-3xl text-gray-400 mb-2"></i>
+                <p className="text-gray-500">No recent activities</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
 
@@ -220,36 +480,80 @@ const Dashboard: React.FC = () => {
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900">Inventory Alerts</h3>
-            <button className="text-sm text-primary hover:text-blue-700">Manage</button>
-          </div>
-          <div className="space-y-4">
-            <div className="border border-red-200 rounded-lg p-4 bg-red-50">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-red-900">Critical Low Stock</p>
-                <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">3 items</span>
-              </div>
-              <p className="text-xs text-red-700">Hydraulic pump seals, Motor bearings, Control valves</p>
-            </div>
-            <div className="border border-orange-200 rounded-lg p-4 bg-orange-50">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-orange-900">Low Stock Warning</p>
-                <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">7 items</span>
-              </div>
-              <p className="text-xs text-orange-700">Electrical components, Safety equipment</p>
-            </div>
-            <div className="border border-green-200 rounded-lg p-4 bg-green-50">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-green-900">Auto-Reorder Triggered</p>
-                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">5 orders</span>
-              </div>
-              <p className="text-xs text-green-700">Expected delivery in 2-3 business days</p>
-            </div>
-          </div>
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <button className="w-full bg-primary text-white py-2 px-4 rounded-button font-medium hover:bg-blue-700 transition-colors whitespace-nowrap">
-              Create Purchase Order
+            <button
+              onClick={() => navigate('/inventory')}
+              className="text-sm text-primary hover:text-blue-700"
+            >
+              Manage
             </button>
           </div>
+
+          {inventoryLoading ? (
+            <div className="flex items-center justify-center h-24">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            </div>
+          ) : lowStockAlerts ? (
+            <div className="space-y-4">
+              {lowStockAlerts.summary.critical > 0 && (
+                <div className="border border-red-200 rounded-lg p-4 bg-red-50">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-red-900">Critical Low Stock</p>
+                    <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">
+                      {lowStockAlerts.summary.critical} items
+                    </span>
+                  </div>
+                  <p className="text-xs text-red-700">
+                    {lowStockAlerts.alerts
+                      .filter(alert => alert.alert_level === 'critical')
+                      .slice(0, 3)
+                      .map(alert => alert.name)
+                      .join(', ')}
+                    {lowStockAlerts.alerts.filter(alert => alert.alert_level === 'critical').length > 3 && '...'}
+                  </p>
+                </div>
+              )}
+
+              {lowStockAlerts.summary.low > 0 && (
+                <div className="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-yellow-900">Low Stock</p>
+                    <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
+                      {lowStockAlerts.summary.low} items
+                    </span>
+                  </div>
+                  <p className="text-xs text-yellow-700">
+                    {lowStockAlerts.alerts
+                      .filter(alert => alert.alert_level === 'low')
+                      .slice(0, 3)
+                      .map(alert => alert.name)
+                      .join(', ')}
+                    {lowStockAlerts.alerts.filter(alert => alert.alert_level === 'low').length > 3 && '...'}
+                  </p>
+                </div>
+              )}
+
+              {lowStockAlerts.summary.total === 0 && (
+                <div className="text-center py-4">
+                  <i className="ri-check-line text-2xl text-green-500 mb-2"></i>
+                  <p className="text-sm text-gray-600">All inventory levels are good</p>
+                </div>
+              )}
+
+              <div className="text-center pt-4">
+                <button
+                  onClick={() => navigate('/inventory')}
+                  className="text-sm text-primary hover:text-blue-700 font-medium"
+                >
+                  View All Inventory →
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <i className="ri-package-line text-3xl text-gray-400 mb-2"></i>
+              <p className="text-gray-500">No inventory data available</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

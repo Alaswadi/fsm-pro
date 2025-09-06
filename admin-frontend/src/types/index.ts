@@ -104,6 +104,7 @@ export interface Job {
   priority: JobPriority;
   status: JobStatus;
   scheduled_date?: string;
+  due_date?: string;
   started_at?: string;
   completed_at?: string;
   estimated_duration?: number;
@@ -118,6 +119,18 @@ export interface Job {
   updated_at: string;
   customer?: Customer;
   technician?: Technician;
+  equipment?: {
+    id: string;
+    serial_number: string;
+    asset_tag?: string;
+    location_details?: string;
+    equipment_type?: {
+      name: string;
+      brand: string;
+      model: string;
+      category?: string;
+    };
+  };
 }
 
 export interface EquipmentType {
@@ -159,17 +172,7 @@ export interface CustomerEquipment {
   customer?: Customer;
 }
 
-export interface EquipmentInventoryCompatibility {
-  id: string;
-  equipment_type_id: string;
-  part_id: string;
-  compatibility_type: string;
-  usage_notes?: string;
-  created_at: string;
-  updated_at: string;
-  equipment_type?: EquipmentType;
-  part?: Part;
-}
+
 
 export interface Part {
   id: string;
@@ -195,12 +198,33 @@ export interface Part {
 export interface DashboardStats {
   activeWorkOrders: number;
   availableTechnicians: number;
+  totalCustomers: number;
+  totalEquipment: number;
   completionRate: number;
   monthlyRevenue: number;
   workOrderTrend: number;
   technicianTrend: number;
   completionTrend: number;
   revenueTrend: number;
+  overdueWorkOrders: number;
+  equipmentNeedingMaintenance: number;
+}
+
+export interface RecentActivity {
+  id: string;
+  type: 'work_order' | 'technician' | 'customer' | 'equipment' | 'completion';
+  icon: string;
+  iconBg: string;
+  iconColor: string;
+  title: string;
+  subtitle: string;
+  timestamp: string;
+  relativeTime: string;
+}
+
+export interface DashboardData {
+  stats: DashboardStats;
+  activities: RecentActivity[];
 }
 
 export interface TechniciansResponse {
@@ -243,12 +267,81 @@ export interface CustomerEquipmentResponse {
   };
 }
 
-export interface EquipmentCompatibilityResponse {
-  compatibility: EquipmentInventoryCompatibility[];
+
+
+export interface InventoryResponse {
+  inventory_items: Part[];
   pagination: {
     page: number;
     limit: number;
     total: number;
     totalPages: number;
   };
+}
+
+export interface InventoryOptions {
+  categories: string[];
+  brands: string[];
+  statuses: string[];
+}
+
+export interface LowStockAlert {
+  id: string;
+  part_number: string;
+  name: string;
+  current_stock: number;
+  min_stock_level: number;
+  alert_level: 'critical' | 'low' | 'normal';
+}
+
+export interface LowStockAlertsResponse {
+  alerts: LowStockAlert[];
+  summary: {
+    critical: number;
+    low: number;
+    total: number;
+  };
+}
+
+// Work Orders / Jobs related types
+export interface JobsResponse {
+  jobs: Job[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface JobOptions {
+  customers: Array<{
+    id: string;
+    name: string;
+    company_name?: string;
+  }>;
+  technicians: Array<{
+    id: string;
+    employee_id: string;
+    full_name: string;
+    is_available: boolean;
+  }>;
+  equipment_types: Array<{
+    id: string;
+    name: string;
+    brand: string;
+    model: string;
+  }>;
+  priorities: JobPriority[];
+  statuses: JobStatus[];
+}
+
+export interface CustomerEquipmentForJob {
+  id: string;
+  serial_number: string;
+  asset_tag?: string;
+  location_details?: string;
+  equipment_name: string;
+  brand: string;
+  model: string;
 }

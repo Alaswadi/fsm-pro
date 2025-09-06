@@ -95,6 +95,7 @@ export interface Job {
   priority: JobPriority;
   status: JobStatus;
   scheduled_date?: string;
+  due_date?: string;
   started_at?: string;
   completed_at?: string;
   estimated_duration?: number;
@@ -171,17 +172,7 @@ export interface CustomerEquipment {
   customer?: Customer;
 }
 
-export interface EquipmentInventoryCompatibility {
-  id: string;
-  equipment_type_id: string;
-  part_id: string;
-  compatibility_type: string;
-  usage_notes?: string;
-  created_at: string;
-  updated_at: string;
-  equipment_type?: EquipmentType;
-  part?: Part;
-}
+
 
 import { Request } from 'express';
 

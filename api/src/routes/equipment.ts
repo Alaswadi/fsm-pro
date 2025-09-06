@@ -14,11 +14,6 @@ import {
   updateCustomerEquipment,
   deleteCustomerEquipment,
 
-  // Equipment-Inventory Compatibility
-  getEquipmentCompatibility,
-  addEquipmentCompatibility,
-  removeEquipmentCompatibility,
-
   // Utility
   getEquipmentOptions
 } from '../controllers/equipmentController';
@@ -45,10 +40,5 @@ router.get('/customer-equipment/:id', getCustomerEquipmentById);
 router.post('/customer-equipment', createCustomerEquipment);
 router.put('/customer-equipment/:id', updateCustomerEquipment);
 router.delete('/customer-equipment/:id', deleteCustomerEquipment);
-
-// Equipment-Inventory Compatibility routes
-router.get('/types/:equipment_type_id/compatibility', getEquipmentCompatibility);
-router.post('/compatibility', addEquipmentCompatibility);
-router.delete('/compatibility/:id', removeEquipmentCompatibility);
 
 export default router;
