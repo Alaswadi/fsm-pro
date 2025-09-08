@@ -254,6 +254,19 @@ class ApiService {
   async getRecentActivities(limit?: number): Promise<ApiResponse<any>> {
     return this.get('/dashboard/activities', { limit });
   }
+
+  // Password reset methods
+  async initiatePasswordReset(email: string): Promise<ApiResponse<any>> {
+    return this.post('/auth/reset-password', { email });
+  }
+
+  async completePasswordReset(token: string, newPassword: string): Promise<ApiResponse<any>> {
+    return this.post('/auth/reset-password/confirm', { token, newPassword });
+  }
+
+  async adminInitiatePasswordReset(technicianId: string): Promise<ApiResponse<any>> {
+    return this.post(`/auth/reset-password/admin/${technicianId}`);
+  }
 }
 
 export const apiService = new ApiService();

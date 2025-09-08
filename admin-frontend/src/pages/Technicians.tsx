@@ -14,9 +14,11 @@ interface TechniciansPageState {
   showModal: boolean;
   showDeleteModal: boolean;
   showProfileModal: boolean;
+  showPasswordResetModal: boolean;
   editingTechnician: Technician | null;
   deletingTechnician: Technician | null;
   viewingTechnician: Technician | null;
+  resettingPasswordTechnician: Technician | null;
   activeDropdown: string | null;
   availableSkills: Array<{id: string, name: string, category?: string}>;
   availableCertifications: Array<{id: string, name: string, issuing_organization?: string}>;
@@ -34,9 +36,11 @@ const Technicians: React.FC = () => {
     showModal: false,
     showDeleteModal: false,
     showProfileModal: false,
+    showPasswordResetModal: false,
     editingTechnician: null,
     deletingTechnician: null,
     viewingTechnician: null,
+    resettingPasswordTechnician: null,
     activeDropdown: null,
     availableSkills: [],
     availableCertifications: [],
@@ -293,6 +297,40 @@ const Technicians: React.FC = () => {
     } catch (error: any) {
       console.error('Error updating availability:', error);
       const errorMessage = error.response?.data?.error || error.message || 'Failed to update availability';
+      toast.error(errorMessage);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!state.resettingPasswordTechnician) return;
+
+    try {
+      const technician = state.resettingPasswordTechnician;
+
+      // Show loading toast
+      const loadingToast = toast.loading(`Sending password reset email to ${technician.user?.full_name}...`);
+
+      const response = await apiService.adminInitiatePasswordReset(technician.id);
+
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+
+      if (response.success) {
+        toast.success(
+          `Password reset email sent to ${technician.user?.email}`,
+          { duration: 5000 }
+        );
+        setState(prev => ({
+          ...prev,
+          showPasswordResetModal: false,
+          resettingPasswordTechnician: null
+        }));
+      } else {
+        throw new Error(response.error || 'Failed to send password reset email');
+      }
+    } catch (error: any) {
+      console.error('Error sending password reset:', error);
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to send password reset email';
       toast.error(errorMessage);
     }
   };
@@ -561,6 +599,22 @@ const Technicians: React.FC = () => {
                                 <span>View Profile</span>
                               </button>
 
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setState(prev => ({
+                                    ...prev,
+                                    showPasswordResetModal: true,
+                                    resettingPasswordTechnician: technician
+                                  }));
+                                  closeDropdown();
+                                }}
+                                className="block w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-2"
+                              >
+                                <i className="ri-lock-password-line"></i>
+                                <span>Reset Password</span>
+                              </button>
+
                               <div className="border-t border-gray-100 my-1"></div>
 
                               <button
@@ -812,6 +866,54 @@ const Technicians: React.FC = () => {
                   className="px-4 py-2 bg-red-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-red-700"
                 >
                   Permanently Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Reset Confirmation Modal */}
+      {state.showPasswordResetModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3 text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+                <i className="ri-lock-password-line text-blue-600 text-xl"></i>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mt-4">Reset Password</h3>
+              <div className="mt-2 px-7 py-3">
+                <p className="text-sm text-gray-500">
+                  Send a password reset email to {state.resettingPasswordTechnician?.user?.full_name}?
+                </p>
+                <div className="mt-3 p-3 bg-blue-50 rounded-md">
+                  <p className="text-sm text-blue-800 font-medium">📧 Email will be sent to:</p>
+                  <p className="text-sm text-blue-700 mt-1 font-mono">
+                    {state.resettingPasswordTechnician?.user?.email}
+                  </p>
+                  <ul className="text-xs text-blue-700 mt-2 space-y-1">
+                    <li>• Technician will receive a secure reset link</li>
+                    <li>• Link expires in 24 hours</li>
+                    <li>• Current password remains valid until reset</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="flex justify-center space-x-3 mt-4">
+                <button
+                  onClick={() => setState(prev => ({
+                    ...prev,
+                    showPasswordResetModal: false,
+                    resettingPasswordTechnician: null
+                  }))}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePasswordReset}
+                  className="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  Send Reset Email
                 </button>
               </div>
             </div>
