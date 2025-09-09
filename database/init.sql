@@ -315,6 +315,23 @@ CREATE TABLE audit_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Mail settings table
+CREATE TABLE mail_settings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+    smtp_host VARCHAR(255),
+    smtp_port INTEGER DEFAULT 587,
+    smtp_secure BOOLEAN DEFAULT false,
+    smtp_user VARCHAR(255),
+    smtp_password VARCHAR(255),
+    from_name VARCHAR(255) DEFAULT 'FSM Pro',
+    from_email VARCHAR(255),
+    is_enabled BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(company_id)
+);
+
 -- Create indexes for better performance
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_email ON users(email);
@@ -378,6 +395,7 @@ CREATE TRIGGER update_customer_equipment_updated_at BEFORE UPDATE ON customer_eq
 CREATE TRIGGER update_equipment_inventory_compatibility_updated_at BEFORE UPDATE ON equipment_inventory_compatibility FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_jobs_updated_at BEFORE UPDATE ON jobs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_parts_updated_at BEFORE UPDATE ON parts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_mail_settings_updated_at BEFORE UPDATE ON mail_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Insert default company
 INSERT INTO companies (id, name, address, phone, email, is_active) VALUES

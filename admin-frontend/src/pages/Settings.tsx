@@ -39,12 +39,24 @@ interface Certification {
   is_active: boolean;
 }
 
+interface MailSettings {
+  smtp_host: string;
+  smtp_port: number;
+  smtp_secure: boolean;
+  smtp_user: string;
+  smtp_password: string;
+  from_name: string;
+  from_email: string;
+  is_enabled: boolean;
+}
+
 interface SettingsState {
-  activeTab: 'company' | 'skills' | 'certifications';
+  activeTab: 'company' | 'skills' | 'certifications' | 'mail';
   loading: boolean;
   company: Company | null;
   skills: Skill[];
   certifications: Certification[];
+  mailSettings: MailSettings | null;
   showSkillModal: boolean;
   showCertModal: boolean;
   editingSkill: Skill | null;
@@ -58,6 +70,7 @@ const Settings: React.FC = () => {
     company: null,
     skills: [],
     certifications: [],
+    mailSettings: null,
     showSkillModal: false,
     showCertModal: false,
     editingSkill: null,
@@ -80,6 +93,19 @@ const Settings: React.FC = () => {
     renewal_notice_days: 30,
     sort_order: 0,
   });
+
+  const [mailForm, setMailForm] = useState<MailSettings>({
+    smtp_host: '',
+    smtp_port: 587,
+    smtp_secure: false,
+    smtp_user: '',
+    smtp_password: '',
+    from_name: 'FSM Pro',
+    from_email: '',
+    is_enabled: false,
+  });
+
+  const [testEmail, setTestEmail] = useState('');
 
   useEffect(() => {
     loadData();
@@ -104,6 +130,12 @@ const Settings: React.FC = () => {
         const response = await apiService.get<Certification[]>('/settings/certifications');
         if (response.success && response.data) {
           setState(prev => ({ ...prev, certifications: response.data || [] }));
+        }
+      } else if (state.activeTab === 'mail') {
+        const response = await apiService.getMailSettings();
+        if (response.success && response.data) {
+          setState(prev => ({ ...prev, mailSettings: response.data }));
+          setMailForm(response.data);
         }
       }
     } catch (error: any) {
@@ -263,6 +295,42 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleMailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await apiService.updateMailSettings(mailForm);
+      if (response.success) {
+        toast.success('Mail settings updated successfully');
+        setState(prev => ({ ...prev, mailSettings: response.data }));
+      } else {
+        throw new Error(response.error || 'Failed to update mail settings');
+      }
+    } catch (error: any) {
+      console.error('Error updating mail settings:', error);
+      toast.error(error.response?.data?.error || 'Failed to update mail settings');
+    }
+  };
+
+  const handleTestEmail = async () => {
+    if (!testEmail.trim()) {
+      toast.error('Please enter a test email address');
+      return;
+    }
+
+    try {
+      const response = await apiService.testMailSettings(testEmail);
+      if (response.success) {
+        toast.success(`Test email sent successfully to ${testEmail}`);
+        setTestEmail('');
+      } else {
+        throw new Error(response.error || 'Failed to send test email');
+      }
+    } catch (error: any) {
+      console.error('Error sending test email:', error);
+      toast.error(error.response?.data?.error || 'Failed to send test email');
+    }
+  };
+
   if (state.loading) {
     return (
       <div className="p-6">
@@ -289,6 +357,7 @@ const Settings: React.FC = () => {
               { id: 'company', label: 'Company Profile', icon: 'ri-building-line' },
               { id: 'skills', label: 'Skills Management', icon: 'ri-tools-line' },
               { id: 'certifications', label: 'Certifications', icon: 'ri-award-line' },
+              { id: 'mail', label: 'Mail Settings', icon: 'ri-mail-settings-line' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -530,6 +599,159 @@ const Settings: React.FC = () => {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {state.activeTab === 'mail' && (
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-gray-900">Mail Settings</h2>
+            </div>
+
+            <form onSubmit={handleMailSubmit} className="space-y-6">
+              {/* Enable/Disable Mail */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-900">Enable Email Service</h3>
+                  <p className="text-sm text-gray-500">Allow the system to send emails for password resets and notifications</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={mailForm.is_enabled}
+                    onChange={(e) => setMailForm(prev => ({ ...prev, is_enabled: e.target.checked }))}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              {/* SMTP Configuration */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">SMTP Host *</label>
+                  <input
+                    type="text"
+                    required={mailForm.is_enabled}
+                    value={mailForm.smtp_host}
+                    onChange={(e) => setMailForm(prev => ({ ...prev, smtp_host: e.target.value }))}
+                    placeholder="smtp.gmail.com"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">SMTP Port *</label>
+                  <input
+                    type="number"
+                    required={mailForm.is_enabled}
+                    value={mailForm.smtp_port}
+                    onChange={(e) => setMailForm(prev => ({ ...prev, smtp_port: parseInt(e.target.value) || 587 }))}
+                    placeholder="587"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">SMTP Username *</label>
+                  <input
+                    type="text"
+                    required={mailForm.is_enabled}
+                    value={mailForm.smtp_user}
+                    onChange={(e) => setMailForm(prev => ({ ...prev, smtp_user: e.target.value }))}
+                    placeholder="your-email@gmail.com"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">SMTP Password *</label>
+                  <input
+                    type="password"
+                    required={mailForm.is_enabled && mailForm.smtp_password !== '••••••••'}
+                    value={mailForm.smtp_password}
+                    onChange={(e) => setMailForm(prev => ({ ...prev, smtp_password: e.target.value }))}
+                    placeholder={mailForm.smtp_password === '••••••••' ? 'Password is set' : 'Enter password'}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">From Name</label>
+                  <input
+                    type="text"
+                    value={mailForm.from_name}
+                    onChange={(e) => setMailForm(prev => ({ ...prev, from_name: e.target.value }))}
+                    placeholder="FSM Pro"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">From Email *</label>
+                  <input
+                    type="email"
+                    required={mailForm.is_enabled}
+                    value={mailForm.from_email}
+                    onChange={(e) => setMailForm(prev => ({ ...prev, from_email: e.target.value }))}
+                    placeholder="noreply@yourcompany.com"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* SSL/TLS Option */}
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="smtp_secure"
+                  checked={mailForm.smtp_secure}
+                  onChange={(e) => setMailForm(prev => ({ ...prev, smtp_secure: e.target.checked }))}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="smtp_secure" className="ml-2 block text-sm text-gray-900">
+                  Use SSL/TLS (recommended for port 465)
+                </label>
+              </div>
+
+              {/* Test Email Section */}
+              {mailForm.is_enabled && (
+                <div className="border-t pt-6">
+                  <h3 className="text-sm font-medium text-gray-900 mb-4">Test Email Configuration</h3>
+                  <div className="flex space-x-4">
+                    <div className="flex-1">
+                      <input
+                        type="email"
+                        value={testEmail}
+                        onChange={(e) => setTestEmail(e.target.value)}
+                        placeholder="Enter test email address"
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleTestEmail}
+                      className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                    >
+                      Send Test Email
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Send a test email to verify your configuration is working correctly.
+                  </p>
+                </div>
+              )}
+
+              {/* Save Button */}
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Save Mail Settings
+                </button>
+              </div>
+            </form>
           </div>
         )}
       </div>

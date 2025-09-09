@@ -267,6 +267,19 @@ class ApiService {
   async adminInitiatePasswordReset(technicianId: string): Promise<ApiResponse<any>> {
     return this.post(`/auth/reset-password/admin/${technicianId}`);
   }
+
+  // Mail settings methods
+  async getMailSettings(): Promise<ApiResponse<any>> {
+    return this.get('/settings/mail');
+  }
+
+  async updateMailSettings(settings: any): Promise<ApiResponse<any>> {
+    return this.put('/settings/mail', settings);
+  }
+
+  async testMailSettings(testEmail: string): Promise<ApiResponse<any>> {
+    return this.post('/settings/mail/test', { test_email: testEmail });
+  }
 }
 
 export const apiService = new ApiService();

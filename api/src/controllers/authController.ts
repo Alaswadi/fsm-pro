@@ -204,7 +204,7 @@ export const initiatePasswordReset = async (req: Request, res: Response) => {
 
     // Check if user exists and is active
     const userResult = await query(
-      'SELECT id, email, full_name, is_active FROM users WHERE email = $1',
+      'SELECT id, email, full_name, is_active, role FROM users WHERE email = $1',
       [sanitizedEmail]
     );
 
@@ -236,10 +236,13 @@ export const initiatePasswordReset = async (req: Request, res: Response) => {
     );
 
     // Send password reset email
+    const isForTechnician = user.role === 'technician';
     const emailResult = await emailService.sendPasswordResetEmail(
       user.email,
       user.full_name,
-      resetToken
+      resetToken,
+      undefined, // companyId - will be determined by email service
+      isForTechnician
     );
 
     if (!emailResult.success) {
@@ -426,7 +429,9 @@ export const adminInitiatePasswordReset = async (req: Request, res: Response) =>
     const emailResult = await emailService.sendPasswordResetEmail(
       technician.email,
       technician.full_name,
-      resetToken
+      resetToken,
+      technician.company_id,
+      true // isForTechnician = true
     );
 
     if (!emailResult.success) {

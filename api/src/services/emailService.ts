@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { ApiResponse } from '../types';
+import { query } from '../config/database';
 
 interface EmailConfig {
   host: string;
@@ -21,9 +22,67 @@ interface EmailOptions {
 class EmailService {
   private transporter: nodemailer.Transporter | null = null;
   private isConfigured = false;
+  private currentCompanyId: string | null = null;
 
   constructor() {
     this.initializeTransporter();
+  }
+
+  // Get mail settings from database for a specific company
+  private async getMailSettings(companyId?: string): Promise<any> {
+    try {
+      if (!companyId) {
+        // If no company ID provided, get the first company's settings
+        const companyResult = await query('SELECT id FROM companies LIMIT 1');
+        if (companyResult.rows.length === 0) {
+          return null;
+        }
+        companyId = companyResult.rows[0].id;
+      }
+
+      const result = await query(
+        'SELECT * FROM mail_settings WHERE company_id = $1 AND is_enabled = true',
+        [companyId]
+      );
+
+      return result.rows.length > 0 ? result.rows[0] : null;
+    } catch (error) {
+      console.error('Error getting mail settings:', error);
+      return null;
+    }
+  }
+
+  // Initialize transporter with database settings
+  private async initializeTransporterForCompany(companyId?: string): Promise<boolean> {
+    try {
+      const settings = await this.getMailSettings(companyId);
+
+      if (!settings) {
+        // Fall back to environment variables if no database settings
+        this.initializeTransporter();
+        return this.isConfigured;
+      }
+
+      const config: EmailConfig = {
+        host: settings.smtp_host,
+        port: settings.smtp_port,
+        secure: settings.smtp_secure,
+        auth: {
+          user: settings.smtp_user,
+          pass: settings.smtp_password,
+        },
+      };
+
+      this.transporter = nodemailer.createTransport(config);
+      this.isConfigured = true;
+      this.currentCompanyId = companyId || null;
+
+      console.log('Email service initialized with database settings for company:', companyId);
+      return true;
+    } catch (error) {
+      console.error('Failed to initialize email service with database settings:', error);
+      return false;
+    }
   }
 
   private initializeTransporter() {
@@ -57,17 +116,34 @@ class EmailService {
     }
   }
 
-  async sendEmail(options: EmailOptions): Promise<ApiResponse> {
+  async sendEmail(options: EmailOptions, companyId?: string): Promise<ApiResponse> {
     try {
-      if (!this.isConfigured || !this.transporter) {
+      // Initialize transporter for the specific company if needed
+      if (!this.isConfigured || this.currentCompanyId !== companyId) {
+        const initialized = await this.initializeTransporterForCompany(companyId);
+        if (!initialized) {
+          return {
+            success: false,
+            error: 'Email service not configured'
+          };
+        }
+      }
+
+      if (!this.transporter) {
         return {
           success: false,
           error: 'Email service not configured'
         };
       }
 
+      // Get mail settings for from address
+      const settings = await this.getMailSettings(companyId);
+      const fromAddress = settings
+        ? `"${settings.from_name}" <${settings.from_email}>`
+        : `"FSM Pro" <${process.env.SMTP_USER}>`;
+
       const mailOptions = {
-        from: `"FSM Pro" <${process.env.SMTP_USER}>`,
+        from: fromAddress,
         to: options.to,
         subject: options.subject,
         html: options.html,
@@ -93,20 +169,27 @@ class EmailService {
   }
 
   async sendPasswordResetEmail(
-    email: string, 
-    fullName: string, 
-    resetToken: string
+    email: string,
+    fullName: string,
+    resetToken: string,
+    companyId?: string,
+    isForTechnician: boolean = true
   ): Promise<ApiResponse> {
     try {
-      const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
-      
-      const html = this.generatePasswordResetEmailTemplate(fullName, resetUrl);
-      
+      // Use mobile app URL for technicians, admin dashboard URL for admins
+      const baseUrl = isForTechnician
+        ? (process.env.MOBILE_APP_URL || 'exp://localhost:8081')
+        : (process.env.FRONTEND_URL || 'http://localhost:3000');
+
+      const resetUrl = `${baseUrl}/reset-password-confirm?token=${resetToken}`;
+
+      const html = this.generatePasswordResetEmailTemplate(fullName, resetUrl, isForTechnician);
+
       return await this.sendEmail({
         to: email,
         subject: 'FSM Pro - Password Reset Request',
         html,
-      });
+      }, companyId);
     } catch (error) {
       console.error('Failed to send password reset email:', error);
       return {
@@ -116,7 +199,7 @@ class EmailService {
     }
   }
 
-  private generatePasswordResetEmailTemplate(fullName: string, resetUrl: string): string {
+  private generatePasswordResetEmailTemplate(fullName: string, resetUrl: string, isForTechnician: boolean = true): string {
     return `
       <!DOCTYPE html>
       <html lang="en">
@@ -199,21 +282,24 @@ class EmailService {
           
           <div class="content">
             <p>Hello ${fullName},</p>
-            
-            <p>We received a request to reset your password for your FSM Pro technician account. If you made this request, click the button below to reset your password:</p>
-            
+
+            <p>We received a request to reset your password for your FSM Pro ${isForTechnician ? 'technician' : 'admin'} account. ${isForTechnician ? 'Your administrator has initiated this password reset.' : 'If you made this request,'} Click the button below to reset your password:</p>
+
             <div style="text-align: center;">
               <a href="${resetUrl}" class="button">Reset Password</a>
             </div>
-            
+
             <div class="warning">
-              <strong>Important:</strong> This link will expire in 1 hour for security reasons. If you don't reset your password within this time, you'll need to request a new reset link.
+              <strong>Important:</strong> This link will expire in ${isForTechnician ? '24 hours' : '1 hour'} for security reasons. If you don't reset your password within this time, you'll need to request a new reset link.
             </div>
-            
-            <p>If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
-            
-            <p>If the button above doesn't work, you can copy and paste this link into your browser:</p>
-            <p style="word-break: break-all; color: #2563eb;">${resetUrl}</p>
+
+            ${isForTechnician ?
+              '<p><strong>For Mobile App Users:</strong> This link will open in your FSM Pro mobile app. Make sure you have the app installed on your device.</p>' :
+              '<p>If you didn\'t request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>'
+            }
+
+            <p>If the button above doesn't work, you can copy and paste this link:</p>
+            <p style="word-break: break-all; color: #2563eb; font-size: 12px;">${resetUrl}</p>
           </div>
           
           <div class="footer">

@@ -9,7 +9,10 @@ import {
   getCompanyCertifications,
   createCompanyCertification,
   updateCompanyCertification,
-  deleteCompanyCertification
+  deleteCompanyCertification,
+  getMailSettings,
+  updateMailSettings,
+  testMailSettings
 } from '../controllers/settingsController';
 import { authenticateToken } from '../middleware/auth';
 import { addCompanyContext, requireCompanyContext } from '../middleware/company';
@@ -36,5 +39,10 @@ router.get('/certifications', getCompanyCertifications);
 router.post('/certifications', createCompanyCertification);
 router.put('/certifications/:id', updateCompanyCertification);
 router.delete('/certifications/:id', deleteCompanyCertification);
+
+// Mail settings routes
+router.get('/mail', getMailSettings);
+router.put('/mail', updateMailSettings);
+router.post('/mail/test', testMailSettings);
 
 export default router;

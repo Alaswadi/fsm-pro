@@ -727,3 +727,246 @@ export const deleteCompanyCertification = async (req: Request, res: Response) =>
     } as ApiResponse);
   }
 };
+
+// Get mail settings
+export const getMailSettings = async (req: Request, res: Response) => {
+  try {
+    const companyId = req.company?.id;
+    if (!companyId) {
+      return res.status(403).json({
+        success: false,
+        error: 'No company context found'
+      } as ApiResponse);
+    }
+
+    const result = await query(
+      'SELECT * FROM mail_settings WHERE company_id = $1',
+      [companyId]
+    );
+
+    // If no settings exist, return default values
+    if (result.rows.length === 0) {
+      const defaultSettings = {
+        smtp_host: '',
+        smtp_port: 587,
+        smtp_secure: false,
+        smtp_user: '',
+        smtp_password: '',
+        from_name: 'FSM Pro',
+        from_email: '',
+        is_enabled: false
+      };
+
+      return res.json({
+        success: true,
+        data: defaultSettings
+      } as ApiResponse);
+    }
+
+    // Remove sensitive password from response
+    const settings = result.rows[0];
+    const { smtp_password, ...safeSettings } = settings;
+
+    res.json({
+      success: true,
+      data: {
+        ...safeSettings,
+        smtp_password: smtp_password ? '••••••••' : '' // Mask password
+      }
+    } as ApiResponse);
+
+  } catch (error) {
+    console.error('Get mail settings error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    } as ApiResponse);
+  }
+};
+
+// Update mail settings
+export const updateMailSettings = async (req: Request, res: Response) => {
+  try {
+    const companyId = req.company?.id;
+    if (!companyId) {
+      return res.status(403).json({
+        success: false,
+        error: 'No company context found'
+      } as ApiResponse);
+    }
+
+    const {
+      smtp_host,
+      smtp_port,
+      smtp_secure,
+      smtp_user,
+      smtp_password,
+      from_name,
+      from_email,
+      is_enabled
+    } = req.body;
+
+    // Validation
+    if (is_enabled) {
+      if (!smtp_host || !smtp_port || !smtp_user || !from_email) {
+        return res.status(400).json({
+          success: false,
+          error: 'SMTP host, port, user, and from email are required when mail is enabled'
+        } as ApiResponse);
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(from_email)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid from email format'
+        } as ApiResponse);
+      }
+    }
+
+    // Check if settings exist
+    const existingResult = await query(
+      'SELECT id, smtp_password FROM mail_settings WHERE company_id = $1',
+      [companyId]
+    );
+
+    let finalPassword = smtp_password;
+
+    // If password is masked (••••••••), keep the existing password
+    if (smtp_password === '••••••••' && existingResult.rows.length > 0) {
+      finalPassword = existingResult.rows[0].smtp_password;
+    }
+
+    if (existingResult.rows.length > 0) {
+      // Update existing settings
+      const result = await query(
+        `UPDATE mail_settings
+         SET smtp_host = $1, smtp_port = $2, smtp_secure = $3, smtp_user = $4,
+             smtp_password = $5, from_name = $6, from_email = $7, is_enabled = $8,
+             updated_at = NOW()
+         WHERE company_id = $9
+         RETURNING id, smtp_host, smtp_port, smtp_secure, smtp_user, from_name, from_email, is_enabled`,
+        [smtp_host, smtp_port, smtp_secure, smtp_user, finalPassword, from_name, from_email, is_enabled, companyId]
+      );
+
+      res.json({
+        success: true,
+        data: {
+          ...result.rows[0],
+          smtp_password: finalPassword ? '••••••••' : ''
+        },
+        message: 'Mail settings updated successfully'
+      } as ApiResponse);
+    } else {
+      // Create new settings
+      const result = await query(
+        `INSERT INTO mail_settings
+         (company_id, smtp_host, smtp_port, smtp_secure, smtp_user, smtp_password, from_name, from_email, is_enabled)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING id, smtp_host, smtp_port, smtp_secure, smtp_user, from_name, from_email, is_enabled`,
+        [companyId, smtp_host, smtp_port, smtp_secure, smtp_user, finalPassword, from_name, from_email, is_enabled]
+      );
+
+      res.json({
+        success: true,
+        data: {
+          ...result.rows[0],
+          smtp_password: finalPassword ? '••••••••' : ''
+        },
+        message: 'Mail settings created successfully'
+      } as ApiResponse);
+    }
+
+  } catch (error) {
+    console.error('Update mail settings error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    } as ApiResponse);
+  }
+};
+
+// Test mail settings
+export const testMailSettings = async (req: Request, res: Response) => {
+  try {
+    const companyId = req.company?.id;
+    if (!companyId) {
+      return res.status(403).json({
+        success: false,
+        error: 'No company context found'
+      } as ApiResponse);
+    }
+
+    const { test_email } = req.body;
+
+    if (!test_email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Test email address is required'
+      } as ApiResponse);
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(test_email)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid email format'
+      } as ApiResponse);
+    }
+
+    // Get mail settings
+    const settingsResult = await query(
+      'SELECT * FROM mail_settings WHERE company_id = $1',
+      [companyId]
+    );
+
+    if (settingsResult.rows.length === 0 || !settingsResult.rows[0].is_enabled) {
+      return res.status(400).json({
+        success: false,
+        error: 'Mail settings not configured or disabled'
+      } as ApiResponse);
+    }
+
+    const settings = settingsResult.rows[0];
+
+    // Import email service dynamically to avoid circular dependencies
+    const { emailService } = await import('../services/emailService');
+
+    // Send test email
+    const result = await emailService.sendEmail({
+      to: test_email,
+      subject: 'FSM Pro - Mail Configuration Test',
+      html: `
+        <h2>Mail Configuration Test</h2>
+        <p>This is a test email to verify your FSM Pro mail configuration.</p>
+        <p><strong>SMTP Host:</strong> ${settings.smtp_host}</p>
+        <p><strong>SMTP Port:</strong> ${settings.smtp_port}</p>
+        <p><strong>From:</strong> ${settings.from_name} &lt;${settings.from_email}&gt;</p>
+        <p>If you received this email, your mail configuration is working correctly!</p>
+        <hr>
+        <p><small>Sent from FSM Pro at ${new Date().toLocaleString()}</small></p>
+      `
+    });
+
+    if (result.success) {
+      res.json({
+        success: true,
+        message: `Test email sent successfully to ${test_email}`
+      } as ApiResponse);
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error || 'Failed to send test email'
+      } as ApiResponse);
+    }
+
+  } catch (error) {
+    console.error('Test mail settings error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    } as ApiResponse);
+  }
+};
