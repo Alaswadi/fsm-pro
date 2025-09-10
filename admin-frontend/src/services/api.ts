@@ -268,6 +268,10 @@ class ApiService {
     return this.post(`/auth/reset-password/admin/${technicianId}`);
   }
 
+  async adminSetPassword(technicianId: string, newPassword: string): Promise<ApiResponse<any>> {
+    return this.post(`/auth/set-password/admin/${technicianId}`, { newPassword });
+  }
+
   // Mail settings methods
   async getMailSettings(): Promise<ApiResponse<any>> {
     return this.get('/settings/mail');

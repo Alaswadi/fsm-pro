@@ -459,3 +459,110 @@ export const adminInitiatePasswordReset = async (req: Request, res: Response) =>
     } as ApiResponse);
   }
 };
+
+// Admin manual password reset - set new password directly
+export const adminSetPassword = async (req: Request, res: Response) => {
+  try {
+    const { technicianId } = req.params;
+    const { newPassword } = req.body;
+    const adminUser = (req as any).user;
+
+    // Verify admin permissions
+    if (!['super_admin', 'admin', 'manager'].includes(adminUser.role)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Insufficient permissions'
+      } as ApiResponse);
+    }
+
+    if (!newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'New password is required'
+      } as ApiResponse);
+    }
+
+    // Validate password strength
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password must be at least 8 characters long'
+      } as ApiResponse);
+    }
+
+    if (newPassword.length > 128) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password must be less than 128 characters'
+      } as ApiResponse);
+    }
+
+    // Check for basic password complexity
+    const hasUpperCase = /[A-Z]/.test(newPassword);
+    const hasLowerCase = /[a-z]/.test(newPassword);
+    const hasNumbers = /\d/.test(newPassword);
+
+    if (!hasUpperCase || !hasLowerCase || !hasNumbers) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+      } as ApiResponse);
+    }
+
+    // Get technician details
+    const technicianResult = await query(
+      `SELECT u.id, u.email, u.full_name, u.is_active, t.company_id
+       FROM users u
+       JOIN technicians t ON u.id = t.user_id
+       WHERE t.id = $1 AND u.role = 'technician'`,
+      [technicianId]
+    );
+
+    if (technicianResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Technician not found'
+      } as ApiResponse);
+    }
+
+    const technician = technicianResult.rows[0];
+
+    if (!technician.is_active) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot set password for inactive technician'
+      } as ApiResponse);
+    }
+
+    // Hash new password
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password and clear any existing reset tokens
+    await query(
+      `UPDATE users
+       SET password_hash = $1,
+           password_reset_token = NULL,
+           password_reset_expires = NULL,
+           updated_at = NOW()
+       WHERE id = $2`,
+      [passwordHash, technician.id]
+    );
+
+    return res.json({
+      success: true,
+      message: `Password updated successfully for ${technician.full_name}`,
+      data: {
+        technicianName: technician.full_name,
+        email: technician.email
+      }
+    } as ApiResponse);
+
+  } catch (error) {
+    console.error('Admin set password error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    } as ApiResponse);
+  }
+};

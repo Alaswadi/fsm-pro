@@ -15,10 +15,12 @@ interface TechniciansPageState {
   showDeleteModal: boolean;
   showProfileModal: boolean;
   showPasswordResetModal: boolean;
+  showSetPasswordModal: boolean;
   editingTechnician: Technician | null;
   deletingTechnician: Technician | null;
   viewingTechnician: Technician | null;
   resettingPasswordTechnician: Technician | null;
+  settingPasswordTechnician: Technician | null;
   activeDropdown: string | null;
   availableSkills: Array<{id: string, name: string, category?: string}>;
   availableCertifications: Array<{id: string, name: string, issuing_organization?: string}>;
@@ -37,10 +39,12 @@ const Technicians: React.FC = () => {
     showDeleteModal: false,
     showProfileModal: false,
     showPasswordResetModal: false,
+    showSetPasswordModal: false,
     editingTechnician: null,
     deletingTechnician: null,
     viewingTechnician: null,
     resettingPasswordTechnician: null,
+    settingPasswordTechnician: null,
     activeDropdown: null,
     availableSkills: [],
     availableCertifications: [],
@@ -59,6 +63,10 @@ const Technicians: React.FC = () => {
     certification_ids: [] as string[],
 
   });
+
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     loadTechnicians();
@@ -331,6 +339,69 @@ const Technicians: React.FC = () => {
     } catch (error: any) {
       console.error('Error sending password reset:', error);
       const errorMessage = error.response?.data?.error || error.message || 'Failed to send password reset email';
+      toast.error(errorMessage);
+    }
+  };
+
+  const handleSetPassword = async () => {
+    if (!state.settingPasswordTechnician) return;
+
+    // Validation
+    if (!newPassword.trim()) {
+      toast.error('Please enter a new password');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters long');
+      return;
+    }
+
+    // Check password complexity
+    const hasUpperCase = /[A-Z]/.test(newPassword);
+    const hasLowerCase = /[a-z]/.test(newPassword);
+    const hasNumbers = /\d/.test(newPassword);
+
+    if (!hasUpperCase || !hasLowerCase || !hasNumbers) {
+      toast.error('Password must contain at least one uppercase letter, one lowercase letter, and one number');
+      return;
+    }
+
+    try {
+      const technician = state.settingPasswordTechnician;
+
+      // Show loading toast
+      const loadingToast = toast.loading(`Setting new password for ${technician.user?.full_name}...`);
+
+      const response = await apiService.adminSetPassword(technician.id, newPassword);
+
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+
+      if (response.success) {
+        toast.success(
+          `Password updated successfully for ${technician.user?.full_name}`,
+          { duration: 5000 }
+        );
+        setState(prev => ({
+          ...prev,
+          showSetPasswordModal: false,
+          settingPasswordTechnician: null
+        }));
+        setNewPassword('');
+        setConfirmPassword('');
+        setShowPassword(false);
+      } else {
+        throw new Error(response.error || 'Failed to set password');
+      }
+    } catch (error: any) {
+      console.error('Error setting password:', error);
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to set password';
       toast.error(errorMessage);
     }
   };
@@ -613,6 +684,22 @@ const Technicians: React.FC = () => {
                               >
                                 <i className="ri-lock-password-line"></i>
                                 <span>Reset Password</span>
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setState(prev => ({
+                                    ...prev,
+                                    showSetPasswordModal: true,
+                                    settingPasswordTechnician: technician
+                                  }));
+                                  closeDropdown();
+                                }}
+                                className="block w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-purple-50 hover:text-purple-700 flex items-center space-x-2"
+                              >
+                                <i className="ri-key-line"></i>
+                                <span>Set New Password</span>
                               </button>
 
                               <div className="border-t border-gray-100 my-1"></div>
@@ -914,6 +1001,116 @@ const Technicians: React.FC = () => {
                   className="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700"
                 >
                   Send Reset Email
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set New Password Modal */}
+      {state.showSetPasswordModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center">
+                  <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-purple-100">
+                    <i className="ri-key-line text-purple-600 text-xl"></i>
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 ml-3">Set New Password</h3>
+                </div>
+                <button
+                  onClick={() => {
+                    setState(prev => ({
+                      ...prev,
+                      showSetPasswordModal: false,
+                      settingPasswordTechnician: null
+                    }));
+                    setNewPassword('');
+                    setConfirmPassword('');
+                    setShowPassword(false);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <i className="ri-close-line text-xl"></i>
+                </button>
+              </div>
+
+              <div className="px-7 py-3">
+                <p className="text-sm text-gray-500 mb-4">
+                  Set a new password for {state.settingPasswordTechnician?.user?.full_name}
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      New Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Enter new password"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      >
+                        <i className={`${showPassword ? 'ri-eye-off-line' : 'ri-eye-line'} text-gray-400 hover:text-gray-600`}></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Confirm Password
+                    </label>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm new password"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div className="bg-gray-50 p-3 rounded-md">
+                    <p className="text-xs text-gray-600 font-medium mb-2">Password Requirements:</p>
+                    <ul className="text-xs text-gray-500 space-y-1">
+                      <li>• At least 8 characters long</li>
+                      <li>• Contains uppercase and lowercase letters</li>
+                      <li>• Contains at least one number</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6 px-7 pb-3">
+                <button
+                  onClick={() => {
+                    setState(prev => ({
+                      ...prev,
+                      showSetPasswordModal: false,
+                      settingPasswordTechnician: null
+                    }));
+                    setNewPassword('');
+                    setConfirmPassword('');
+                    setShowPassword(false);
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSetPassword}
+                  disabled={!newPassword || !confirmPassword}
+                  className="px-4 py-2 bg-purple-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  Set Password
                 </button>
               </div>
             </div>

@@ -6,7 +6,8 @@ import {
   getProfile,
   initiatePasswordReset,
   completePasswordReset,
-  adminInitiatePasswordReset
+  adminInitiatePasswordReset,
+  adminSetPassword
 } from '../controllers/authController';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import {
@@ -31,5 +32,6 @@ router.get('/profile', authenticateToken, getProfile);
 
 // Admin-only routes with rate limiting
 router.post('/reset-password/admin/:technicianId', authenticateToken, requireAdmin, adminPasswordResetLimiter, adminInitiatePasswordReset);
+router.post('/set-password/admin/:technicianId', authenticateToken, requireAdmin, adminPasswordResetLimiter, adminSetPassword);
 
 export default router;
