@@ -404,15 +404,15 @@ INSERT INTO companies (id, name, address, phone, email, is_active) VALUES
 -- Insert default admin user (password: Admin@123)
 -- Password hash for 'Admin@123' using bcrypt with salt rounds 10
 INSERT INTO users (id, email, password_hash, full_name, role, is_active, email_verified) VALUES
-(uuid_generate_v4(), 'admin@fsm.com', '$2a$10$rZ5c3Hx8qVYKGHJK5YvXXuqK5YvXXuqK5YvXXuqK5YvXXuqK5YvXXu', 'System Administrator', 'super_admin', true, true);
+(uuid_generate_v4(), 'admin@fsm.com', '$2b$10$MTNELq3ZPaXzwH2aJbV51uwhltRrmgbAxmDK7iKvI0ERXVP5rtD26', 'System Administrator', 'super_admin', true, true);
 
--- Insert sample technician users (password: tech123)
+-- Insert sample technician users (password: Tech@123)
 INSERT INTO users (id, email, password_hash, full_name, phone, role, is_active, email_verified) VALUES
-('11111111-1111-1111-1111-111111111111', 'michael.rodriguez@fsm.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Michael Rodriguez', '+1-555-0101', 'technician', true, true),
-('22222222-2222-2222-2222-222222222222', 'sarah.chen@fsm.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Sarah Chen', '+1-555-0102', 'technician', true, true),
-('33333333-3333-3333-3333-333333333333', 'david.thompson@fsm.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'David Thompson', '+1-555-0103', 'technician', true, true),
-('44444444-4444-4444-4444-444444444444', 'lisa.martinez@fsm.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Lisa Martinez', '+1-555-0104', 'technician', true, true),
-('55555555-5555-5555-5555-555555555555', 'james.wilson@fsm.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'James Wilson', '+1-555-0105', 'technician', true, true);
+('11111111-1111-1111-1111-111111111111', 'michael.rodriguez@fsm.com', '$2b$10$MTNELq3ZPaXzwH2aJbV51uwhltRrmgbAxmDK7iKvI0ERXVP5rtD26', 'Michael Rodriguez', '+1-555-0101', 'technician', true, true),
+('22222222-2222-2222-2222-222222222222', 'sarah.chen@fsm.com', '$2b$10$MTNELq3ZPaXzwH2aJbV51uwhltRrmgbAxmDK7iKvI0ERXVP5rtD26', 'Sarah Chen', '+1-555-0102', 'technician', true, true),
+('33333333-3333-3333-3333-333333333333', 'david.thompson@fsm.com', '$2b$10$MTNELq3ZPaXzwH2aJbV51uwhltRrmgbAxmDK7iKvI0ERXVP5rtD26', 'David Thompson', '+1-555-0103', 'technician', true, true),
+('44444444-4444-4444-4444-444444444444', 'lisa.martinez@fsm.com', '$2b$10$MTNELq3ZPaXzwH2aJbV51uwhltRrmgbAxmDK7iKvI0ERXVP5rtD26', 'Lisa Martinez', '+1-555-0104', 'technician', true, true),
+('55555555-5555-5555-5555-555555555555', 'james.wilson@fsm.com', '$2b$10$MTNELq3ZPaXzwH2aJbV51uwhltRrmgbAxmDK7iKvI0ERXVP5rtD26', 'James Wilson', '+1-555-0105', 'technician', true, true);
 
 -- Get the default company ID for technicians
 DO $$
