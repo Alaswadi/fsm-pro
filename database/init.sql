@@ -203,6 +203,28 @@ CREATE TABLE customer_equipment (
     UNIQUE(company_id, serial_number)
 );
 
+-- Parts/Inventory table
+CREATE TABLE parts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+    part_number VARCHAR(100) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    category VARCHAR(100),
+    brand VARCHAR(100),
+    unit_price DECIMAL(10,2) NOT NULL,
+    cost_price DECIMAL(10,2),
+    current_stock INTEGER DEFAULT 0,
+    min_stock_level INTEGER DEFAULT 0,
+    max_stock_level INTEGER DEFAULT 100,
+    status part_status DEFAULT 'available',
+    supplier_info JSONB,
+    compatible_equipment UUID[], -- Array of equipment_type IDs
+    image_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Equipment-Inventory compatibility table (many-to-many relationship)
 CREATE TABLE equipment_inventory_compatibility (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -238,28 +260,6 @@ CREATE TABLE jobs (
     rating INTEGER CHECK (rating >= 1 AND rating <= 5),
     total_cost DECIMAL(10,2),
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Parts/Inventory table
-CREATE TABLE parts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
-    part_number VARCHAR(100) UNIQUE NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    category VARCHAR(100),
-    brand VARCHAR(100),
-    unit_price DECIMAL(10,2) NOT NULL,
-    cost_price DECIMAL(10,2),
-    current_stock INTEGER DEFAULT 0,
-    min_stock_level INTEGER DEFAULT 0,
-    max_stock_level INTEGER DEFAULT 100,
-    status part_status DEFAULT 'available',
-    supplier_info JSONB,
-    compatible_equipment UUID[], -- Array of equipment_type IDs
-    image_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
