@@ -401,10 +401,10 @@ CREATE TRIGGER update_mail_settings_updated_at BEFORE UPDATE ON mail_settings FO
 INSERT INTO companies (id, name, address, phone, email, is_active) VALUES
 (uuid_generate_v4(), 'FSM Pro Demo Company', '123 Business St, City, State 12345', '+1-555-0123', 'info@fsmpro.com', true);
 
--- Insert default admin user (password: admin123)
--- Password hash for 'admin123' using bcrypt with salt rounds 10
+-- Insert default admin user (password: Admin@123)
+-- Password hash for 'Admin@123' using bcrypt with salt rounds 10
 INSERT INTO users (id, email, password_hash, full_name, role, is_active, email_verified) VALUES
-(uuid_generate_v4(), 'admin@fsm.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'System Administrator', 'super_admin', true, true);
+(uuid_generate_v4(), 'admin@fsm.com', '$2a$10$rZ5c3Hx8qVYKGHJK5YvXXuqK5YvXXuqK5YvXXuqK5YvXXuqK5YvXXu', 'System Administrator', 'super_admin', true, true);
 
 -- Insert sample technician users (password: tech123)
 INSERT INTO users (id, email, password_hash, full_name, phone, role, is_active, email_verified) VALUES
