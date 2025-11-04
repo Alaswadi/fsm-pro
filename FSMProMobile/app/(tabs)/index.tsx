@@ -173,6 +173,8 @@ export default function WorkOrdersScreen() {
           </View>
         }
       />
+
+
     </View>
   );
 }
@@ -319,4 +321,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 32,
   },
+
 });

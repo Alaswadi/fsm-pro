@@ -35,7 +35,9 @@ export default function InventoryScreen() {
       const response = await apiService.getInventory();
       
       if (response.success && response.data) {
-        setInventory(response.data);
+        // Extract inventory_items array from the response data
+        const inventoryItems = response.data.inventory_items || [];
+        setInventory(inventoryItems);
       } else {
         Alert.alert('Error', response.error || 'Failed to load inventory');
       }
@@ -54,8 +56,8 @@ export default function InventoryScreen() {
 
     const filtered = inventory.filter(item =>
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchQuery.toLowerCase())
+      item.part_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.category && item.category.toLowerCase().includes(searchQuery.toLowerCase()))
     );
     setFilteredInventory(filtered);
   };
@@ -67,9 +69,9 @@ export default function InventoryScreen() {
   };
 
   const getStockStatus = (item: InventoryItem) => {
-    if (item.quantity === 0) {
+    if (item.current_stock === 0) {
       return { status: 'Out of Stock', color: '#EF4444' };
-    } else if (item.min_stock_level && item.quantity <= item.min_stock_level) {
+    } else if (item.min_stock_level && item.current_stock <= item.min_stock_level) {
       return { status: 'Low Stock', color: '#F59E0B' };
     } else {
       return { status: 'In Stock', color: '#10B981' };
@@ -84,10 +86,10 @@ export default function InventoryScreen() {
         <View style={styles.itemHeader}>
           <View style={styles.itemInfo}>
             <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
-            <Text style={styles.itemSku}>SKU: {item.sku}</Text>
+            <Text style={styles.itemSku}>Part #: {item.part_number}</Text>
           </View>
           <View style={styles.stockContainer}>
-            <Text style={styles.quantityText}>{item.quantity}</Text>
+            <Text style={styles.quantityText}>{item.current_stock}</Text>
             <Text style={styles.unitText}>units</Text>
           </View>
         </View>
@@ -99,29 +101,29 @@ export default function InventoryScreen() {
         )}
 
         <View style={styles.itemDetails}>
-          <View style={styles.detailRow}>
-            <Ionicons name="pricetag-outline" size={16} color="#6B7280" />
-            <Text style={styles.detailText}>Category: {item.category}</Text>
-          </View>
+          {item.category && (
+            <View style={styles.detailRow}>
+              <Ionicons name="pricetag-outline" size={16} color="#6B7280" />
+              <Text style={styles.detailText}>Category: {item.category}</Text>
+            </View>
+          )}
           
           <View style={styles.detailRow}>
             <Ionicons name="cash-outline" size={16} color="#6B7280" />
             <Text style={styles.detailText}>
-              ${item.unit_price.toFixed(2)} per unit
+              ${Number(item.unit_price || 0).toFixed(2)} per unit
             </Text>
           </View>
 
-          {item.location && (
-            <View style={styles.detailRow}>
-              <Ionicons name="location-outline" size={16} color="#6B7280" />
-              <Text style={styles.detailText}>Location: {item.location}</Text>
-            </View>
-          )}
+          <View style={styles.detailRow}>
+            <Ionicons name="checkmark-circle-outline" size={16} color="#6B7280" />
+            <Text style={styles.detailText}>Status: {item.status}</Text>
+          </View>
 
-          {item.supplier && (
+          {item.supplier_info && (
             <View style={styles.detailRow}>
               <Ionicons name="business-outline" size={16} color="#6B7280" />
-              <Text style={styles.detailText}>Supplier: {item.supplier}</Text>
+              <Text style={styles.detailText}>Supplier: {JSON.stringify(item.supplier_info)}</Text>
             </View>
           )}
         </View>
@@ -155,7 +157,7 @@ export default function InventoryScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Inventory</Text>
         <Text style={styles.headerSubtitle}>
-          {inventory.length} items • {inventory.reduce((sum, item) => sum + item.quantity, 0)} total units
+          {inventory.length} items • {Array.isArray(inventory) ? inventory.reduce((sum, item) => sum + (item.current_stock || 0), 0) : 0} total units
         </Text>
       </View>
 

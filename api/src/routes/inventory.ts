@@ -7,7 +7,9 @@ import {
   deleteInventoryItem,
   updateStockLevel,
   getInventoryOptions,
-  getLowStockAlerts
+  getLowStockAlerts,
+  processInventoryOrder,
+  getWorkOrderInventoryOrders
 } from '../controllers/inventoryController';
 import { authenticateToken } from '../middleware/auth';
 import { addCompanyContext, requireCompanyContext } from '../middleware/company';
@@ -25,6 +27,9 @@ router.get('/options', getInventoryOptions);
 // GET /api/inventory/alerts - Get low stock alerts
 router.get('/alerts', getLowStockAlerts);
 
+// GET /api/inventory/work-orders/:workOrderId/orders - Get ordered equipment for work order
+router.get('/work-orders/:workOrderId/orders', getWorkOrderInventoryOrders);
+
 // GET /api/inventory - Get all inventory items with pagination and filtering
 router.get('/', getInventoryItems);
 
@@ -33,6 +38,9 @@ router.get('/:id', getInventoryItem);
 
 // POST /api/inventory - Create new inventory item
 router.post('/', createInventoryItem);
+
+// POST /api/inventory/order - Process inventory order for work order
+router.post('/order', processInventoryOrder);
 
 // PUT /api/inventory/:id - Update inventory item
 router.put('/:id', updateInventoryItem);

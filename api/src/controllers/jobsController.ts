@@ -145,6 +145,7 @@ export const getJobs = async (req: AuthRequest, res: Response) => {
       actual_duration: row.actual_duration,
       customer_signature: row.customer_signature,
       technician_notes: row.technician_notes,
+      notes: row.technician_notes, // Alias for frontend compatibility
       customer_feedback: row.customer_feedback,
       rating: row.rating,
       total_cost: row.total_cost,
@@ -270,6 +271,7 @@ export const getJob = async (req: AuthRequest, res: Response) => {
       actual_duration: row.actual_duration,
       customer_signature: row.customer_signature,
       technician_notes: row.technician_notes,
+      notes: row.technician_notes, // Alias for frontend compatibility
       customer_feedback: row.customer_feedback,
       rating: row.rating,
       total_cost: row.total_cost,
@@ -520,6 +522,7 @@ export const createJob = async (req: AuthRequest, res: Response) => {
       actual_duration: row.actual_duration,
       customer_signature: row.customer_signature,
       technician_notes: row.technician_notes,
+      notes: row.technician_notes, // Alias for frontend compatibility
       customer_feedback: row.customer_feedback,
       rating: row.rating,
       total_cost: row.total_cost,
@@ -584,6 +587,7 @@ export const updateJob = async (req: AuthRequest, res: Response) => {
       due_date,
       estimated_duration,
       technician_notes,
+      notes, // Support both 'notes' and 'technician_notes' for compatibility
       customer_feedback,
       rating,
       total_cost
@@ -750,9 +754,11 @@ export const updateJob = async (req: AuthRequest, res: Response) => {
       paramIndex++;
     }
 
-    if (technician_notes !== undefined) {
+    // Handle both 'notes' and 'technician_notes' fields (notes takes precedence for compatibility)
+    const notesValue = notes !== undefined ? notes : technician_notes;
+    if (notesValue !== undefined) {
       updateFields.push(`technician_notes = $${paramIndex}`);
-      updateValues.push(technician_notes);
+      updateValues.push(notesValue);
       paramIndex++;
     }
 

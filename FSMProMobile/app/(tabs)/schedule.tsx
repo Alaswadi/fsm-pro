@@ -2,57 +2,134 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  FlatList,
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Calendar, DateData } from 'react-native-calendars';
 import { Job } from '../../src/types';
 import { apiService } from '../../src/services/api';
 
 export default function ScheduleScreen() {
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [markedDates, setMarkedDates] = useState<any>({});
 
   useEffect(() => {
-    loadScheduledJobs();
-  }, [selectedDate]);
+    loadAllScheduledJobs();
+  }, []);
 
-  const loadScheduledJobs = async () => {
+  useEffect(() => {
+    filterJobsByDate();
+  }, [selectedDate, allJobs]);
+
+  const loadAllScheduledJobs = async () => {
     try {
       setIsLoading(true);
-      const response = await apiService.getJobs({ 
-        status: 'scheduled',
-        // You can add date filtering here if your API supports it
-      });
+      
+      // Fetch all jobs to show in calendar
+      const response = await apiService.getJobs({});
+      
+      console.log('Schedule API Response:', response);
       
       if (response.success && response.data) {
-        // Filter jobs for the selected date (client-side filtering)
-        const dateString = selectedDate.toISOString().split('T')[0];
-        const filteredJobs = response.data.jobs.filter(job => 
-          job.scheduled_date.startsWith(dateString)
+        const allJobsList = response.data.jobs || [];
+        console.log('Total jobs fetched:', allJobsList.length);
+        
+        // Show all jobs that have a scheduled_date (regardless of status)
+        const jobsWithDates = allJobsList.filter(job => 
+          job.scheduled_date && job.status !== 'cancelled'
         );
-        setJobs(filteredJobs);
+        
+        console.log('Jobs with scheduled dates:', jobsWithDates.length);
+        console.log('Jobs data:', jobsWithDates);
+        
+        setAllJobs(jobsWithDates);
+        generateMarkedDates(jobsWithDates);
       } else {
+        console.error('Failed to load jobs:', response.error);
         Alert.alert('Error', response.error || 'Failed to load schedule');
       }
     } catch (error) {
+      console.error('Exception loading jobs:', error);
       Alert.alert('Error', 'Failed to load schedule');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const generateMarkedDates = (jobsList: Job[]) => {
+    const marked: any = {};
+    
+    jobsList.forEach(job => {
+      const dateKey = job.scheduled_date.split('T')[0];
+      if (!marked[dateKey]) {
+        marked[dateKey] = { 
+          marked: true, 
+          dotColor: '#ea2a33',
+          dots: [{ color: '#ea2a33' }]
+        };
+      }
+    });
+
+    // Add selected date styling
+    if (marked[selectedDate]) {
+      marked[selectedDate] = {
+        ...marked[selectedDate],
+        selected: true,
+        selectedColor: '#ea2a33',
+      };
+    } else {
+      marked[selectedDate] = {
+        selected: true,
+        selectedColor: '#ea2a33',
+      };
+    }
+
+    setMarkedDates(marked);
+  };
+
+  const filterJobsByDate = () => {
+    const filteredJobs = allJobs.filter(job => 
+      job.scheduled_date.startsWith(selectedDate)
+    );
+    setJobs(filteredJobs);
+  };
+
   const onRefresh = async () => {
     setIsRefreshing(true);
-    await loadScheduledJobs();
+    await loadAllScheduledJobs();
     setIsRefreshing(false);
+  };
+
+  const onDayPress = (day: DateData) => {
+    setSelectedDate(day.dateString);
+    const marked = { ...markedDates };
+    
+    // Remove previous selection
+    Object.keys(marked).forEach(key => {
+      if (marked[key].selected) {
+        marked[key] = { ...marked[key], selected: false };
+        delete marked[key].selectedColor;
+      }
+    });
+
+    // Add new selection
+    marked[day.dateString] = {
+      ...marked[day.dateString],
+      selected: true,
+      selectedColor: '#ea2a33',
+    };
+
+    setMarkedDates(marked);
   };
 
   const formatTime = (dateString: string) => {
@@ -62,86 +139,15 @@ export default function ScheduleScreen() {
     });
   };
 
-  const getNextDays = (days: number) => {
-    const dates = [];
-    for (let i = 0; i < days; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() + i);
-      dates.push(date);
-    }
-    return dates;
+  const formatSelectedDate = (dateString: string) => {
+    const date = new Date(dateString + 'T00:00:00');
+    return date.toLocaleDateString([], { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
   };
-
-  const renderDateButton = (date: Date) => {
-    const isSelected = date.toDateString() === selectedDate.toDateString();
-    const isToday = date.toDateString() === new Date().toDateString();
-    
-    return (
-      <TouchableOpacity
-        key={date.toISOString()}
-        style={[
-          styles.dateButton,
-          isSelected && styles.dateButtonSelected
-        ]}
-        onPress={() => setSelectedDate(date)}
-      >
-        <Text style={[
-          styles.dateButtonDay,
-          isSelected && styles.dateButtonTextSelected
-        ]}>
-          {date.toLocaleDateString([], { weekday: 'short' })}
-        </Text>
-        <Text style={[
-          styles.dateButtonDate,
-          isSelected && styles.dateButtonTextSelected,
-          isToday && !isSelected && styles.todayText
-        ]}>
-          {date.getDate()}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderJobItem = ({ item }: { item: Job }) => (
-    <TouchableOpacity
-      style={styles.jobCard}
-      onPress={() => router.push(`/work-order-details?id=${item.id}`)}
-    >
-      <View style={styles.timeContainer}>
-        <Text style={styles.timeText}>{formatTime(item.scheduled_date)}</Text>
-        {item.estimated_duration && (
-          <Text style={styles.durationText}>
-            {item.estimated_duration}h estimated
-          </Text>
-        )}
-      </View>
-      
-      <View style={styles.jobContent}>
-        <Text style={styles.jobTitle} numberOfLines={2}>{item.title}</Text>
-        <Text style={styles.customerName}>{item.customer_name}</Text>
-        
-        <View style={styles.jobMeta}>
-          <View style={styles.priorityContainer}>
-            <View style={[
-              styles.priorityDot, 
-              { backgroundColor: getPriorityColor(item.priority) }
-            ]} />
-            <Text style={styles.priorityText}>{item.priority.toUpperCase()}</Text>
-          </View>
-          
-          {item.equipment_info && (
-            <Text style={styles.equipmentText} numberOfLines={1}>
-              {item.equipment_info}
-            </Text>
-          )}
-        </View>
-      </View>
-      
-      <View style={styles.actionContainer}>
-        <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-      </View>
-    </TouchableOpacity>
-  );
 
   const getPriorityColor = (priority: Job['priority']) => {
     switch (priority) {
@@ -149,6 +155,16 @@ export default function ScheduleScreen() {
       case 'high': return '#F59E0B';
       case 'medium': return '#3B82F6';
       case 'low': return '#10B981';
+      default: return '#6B7280';
+    }
+  };
+
+  const getStatusColor = (status: Job['status']) => {
+    switch (status) {
+      case 'scheduled': return '#3B82F6';
+      case 'in_progress': return '#F59E0B';
+      case 'completed': return '#10B981';
+      case 'cancelled': return '#EF4444';
       default: return '#6B7280';
     }
   };
@@ -164,34 +180,7 @@ export default function ScheduleScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Schedule</Text>
-        <Text style={styles.headerSubtitle}>
-          {selectedDate.toLocaleDateString([], { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}
-        </Text>
-      </View>
-
-      <View style={styles.dateSelector}>
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={getNextDays(7)}
-          renderItem={({ item }) => renderDateButton(item)}
-          keyExtractor={(item) => item.toISOString()}
-          contentContainerStyle={styles.dateSelectorContent}
-        />
-      </View>
-
-      <FlatList
-        data={jobs}
-        renderItem={renderJobItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
+      <ScrollView
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -199,16 +188,112 @@ export default function ScheduleScreen() {
             colors={['#ea2a33']}
           />
         }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
-            <Text style={styles.emptyText}>No jobs scheduled</Text>
-            <Text style={styles.emptySubtext}>
-              You have no jobs scheduled for {selectedDate.toLocaleDateString()}
+      >
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Schedule</Text>
+        </View>
+
+        <View style={styles.calendarContainer}>
+          <Calendar
+            current={selectedDate}
+            onDayPress={onDayPress}
+            markedDates={markedDates}
+            theme={{
+              backgroundColor: '#ffffff',
+              calendarBackground: '#ffffff',
+              textSectionTitleColor: '#6B7280',
+              selectedDayBackgroundColor: '#ea2a33',
+              selectedDayTextColor: '#ffffff',
+              todayTextColor: '#ea2a33',
+              dayTextColor: '#111827',
+              textDisabledColor: '#D1D5DB',
+              dotColor: '#ea2a33',
+              selectedDotColor: '#ffffff',
+              arrowColor: '#ea2a33',
+              monthTextColor: '#111827',
+              indicatorColor: '#ea2a33',
+              textDayFontFamily: 'System',
+              textMonthFontFamily: 'System',
+              textDayHeaderFontFamily: 'System',
+              textDayFontWeight: '400',
+              textMonthFontWeight: '600',
+              textDayHeaderFontWeight: '500',
+              textDayFontSize: 16,
+              textMonthFontSize: 18,
+              textDayHeaderFontSize: 14,
+            }}
+            style={styles.calendar}
+          />
+        </View>
+
+        <View style={styles.jobsSection}>
+          <View style={styles.jobsHeader}>
+            <Text style={styles.jobsHeaderTitle}>
+              {formatSelectedDate(selectedDate)}
+            </Text>
+            <Text style={styles.jobsCount}>
+              {jobs.length} {jobs.length === 1 ? 'job' : 'jobs'}
             </Text>
           </View>
-        }
-      />
+
+          {jobs.length > 0 ? (
+            jobs.map((job) => (
+              <TouchableOpacity
+                key={job.id}
+                style={styles.jobCard}
+                onPress={() => router.push(`/work-order-details?id=${job.id}`)}
+              >
+                <View style={styles.timeContainer}>
+                  <Text style={styles.timeText}>{formatTime(job.scheduled_date)}</Text>
+                  {job.estimated_duration && (
+                    <Text style={styles.durationText}>
+                      {job.estimated_duration}h
+                    </Text>
+                  )}
+                </View>
+                
+                <View style={styles.jobContent}>
+                  <View style={styles.jobTitleRow}>
+                    <Text style={styles.jobTitle} numberOfLines={2}>{job.title}</Text>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(job.status) }]}>
+                      <Text style={styles.statusText}>{job.status.replace('_', ' ').toUpperCase()}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.customerName}>{job.customer_name || 'No customer'}</Text>
+                  
+                  <View style={styles.jobMeta}>
+                    <View style={styles.priorityContainer}>
+                      <View style={[
+                        styles.priorityDot, 
+                        { backgroundColor: getPriorityColor(job.priority) }
+                      ]} />
+                      <Text style={styles.priorityText}>{job.priority.toUpperCase()}</Text>
+                    </View>
+                    
+                    {job.equipment_info && (
+                      <Text style={styles.equipmentText} numberOfLines={1}>
+                        {job.equipment_info}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                
+                <View style={styles.actionContainer}>
+                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
+              <Text style={styles.emptyText}>No jobs scheduled</Text>
+              <Text style={styles.emptySubtext}>
+                You have no jobs scheduled for this date
+              </Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -234,59 +319,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#111827',
-    marginBottom: 4,
   },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  dateSelector: {
+  calendarContainer: {
     backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
   },
-  dateSelectorContent: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+  calendar: {
+    paddingBottom: 10,
   },
-  dateButton: {
+  jobsSection: {
+    padding: 20,
+  },
+  jobsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginRight: 12,
-    borderRadius: 12,
-    backgroundColor: '#F3F4F6',
-    minWidth: 60,
+    marginBottom: 16,
   },
-  dateButtonSelected: {
-    backgroundColor: '#ea2a33',
-  },
-  dateButtonDay: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  dateButtonDate: {
-    fontSize: 16,
+  jobsHeaderTitle: {
+    fontSize: 18,
     fontWeight: '600',
     color: '#111827',
+    flex: 1,
   },
-  dateButtonTextSelected: {
-    color: 'white',
-  },
-  todayText: {
-    color: '#ea2a33',
-  },
-  listContainer: {
-    padding: 20,
+  jobsCount: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   jobCard: {
     backgroundColor: 'white',
@@ -322,11 +398,28 @@ const styles = StyleSheet.create({
   jobContent: {
     flex: 1,
   },
+  jobTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 4,
+  },
   jobTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#111827',
-    marginBottom: 4,
+    flex: 1,
+    marginRight: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'white',
   },
   customerName: {
     fontSize: 14,

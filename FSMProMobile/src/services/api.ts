@@ -220,6 +220,25 @@ class ApiService {
     }
   }
 
+  async createJob(data: {
+    customer_id: string;
+    equipment_id?: string;
+    technician_id: string;
+    title: string;
+    description: string;
+    priority?: 'low' | 'medium' | 'high' | 'urgent';
+    scheduled_date: string;
+    due_date: string;
+    estimated_duration?: number;
+  }): Promise<ApiResponse<Job>> {
+    try {
+      const response = await this.api.post('/jobs', data);
+      return this.handleResponse<Job>(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
   // Technician endpoints
   async getTechnicians(): Promise<ApiResponse<Technician[]>> {
     try {
@@ -282,6 +301,67 @@ class ApiService {
     try {
       const response = await this.api.get('/inventory');
       return this.handleResponse<InventoryItem[]>(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  async processInventoryOrder(data: {
+    work_order_id: string;
+    items: Array<{ item_id: string; quantity: number }>;
+  }): Promise<ApiResponse<{
+    work_order_id: string;
+    order_summary: {
+      total_items: number;
+      items: Array<{
+        item_id: string;
+        item_name: string;
+        quantity_ordered: number;
+        previous_stock: number;
+        new_stock: number;
+      }>;
+    };
+    message: string;
+  }>> {
+    try {
+      const response = await this.api.post('/inventory/order', data);
+      return this.handleResponse(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  // Get ordered equipment for a work order
+  async getWorkOrderInventoryOrders(workOrderId: string): Promise<ApiResponse<{
+    orders: Array<{
+      id: string;
+      work_order_id: string;
+      quantity: number;
+      unit_price: number;
+      total_price: number;
+      ordered_at: string;
+      status: string;
+      notes?: string;
+      part_id: string;
+      part_number: string;
+      part_name: string;
+      part_description?: string;
+      category: string;
+      current_unit_price: number;
+      current_stock: number;
+      ordered_by_name: string;
+      ordered_by_email: string;
+    }>;
+    summary: {
+      total_orders: number;
+      total_items: number;
+      total_value: number;
+      status_breakdown: Record<string, number>;
+    };
+  }>> {
+    try {
+      const response = await this.api.get(`/inventory/work-orders/${workOrderId}/orders`);
+      return this.handleResponse(response);
     } catch (error) {
       return this.handleError(error);
     }

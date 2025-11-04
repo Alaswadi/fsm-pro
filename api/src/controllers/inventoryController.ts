@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { query } from '../config/database';
-import { ApiResponse, Part } from '../types';
+import { ApiResponse, Part, AuthRequest } from '../types';
 
 // Get all inventory items with pagination and filtering
 export const getInventoryItems = async (req: Request, res: Response) => {
@@ -129,6 +129,85 @@ export const getInventoryItems = async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: 'Internal server error'
+    } as ApiResponse);
+  }
+};
+
+// Get ordered equipment for a specific work order
+export const getWorkOrderInventoryOrders = async (req: Request, res: Response) => {
+  try {
+    const { workOrderId } = req.params;
+    const companyId = req.company?.id;
+
+    if (!companyId) {
+      return res.status(403).json({
+        success: false,
+        error: 'No company context found'
+      } as ApiResponse);
+    }
+
+    if (!workOrderId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Work order ID is required'
+      } as ApiResponse);
+    }
+
+    // Get all ordered equipment for the work order with part details
+    const ordersQuery = `
+      SELECT 
+        wo.id,
+        wo.work_order_id,
+        wo.quantity,
+        wo.unit_price,
+        wo.total_price,
+        wo.ordered_at,
+        wo.status,
+        wo.notes,
+        p.id as part_id,
+        p.part_number,
+        p.name as part_name,
+        p.description as part_description,
+        p.category,
+        p.unit_price as current_unit_price,
+        p.current_stock,
+        u.full_name as ordered_by_name,
+        u.email as ordered_by_email
+      FROM work_order_inventory_orders wo
+      LEFT JOIN parts p ON wo.part_id = p.id
+      LEFT JOIN users u ON wo.ordered_by = u.id
+      WHERE wo.work_order_id = $1
+        AND p.company_id = $2
+      ORDER BY wo.ordered_at DESC
+    `;
+
+    const result = await query(ordersQuery, [workOrderId, companyId]);
+
+    // Calculate summary statistics
+    const orders = result.rows;
+    const summary = {
+      total_orders: orders.length,
+      total_items: orders.reduce((sum, order) => sum + order.quantity, 0),
+      total_value: orders.reduce((sum, order) => sum + parseFloat(order.total_price || 0), 0),
+      status_breakdown: orders.reduce((acc, order) => {
+        acc[order.status] = (acc[order.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>)
+    };
+
+    res.json({
+      success: true,
+      data: {
+        orders,
+        summary
+      }
+    } as ApiResponse);
+
+  } catch (error) {
+    console.error('Get work order inventory orders error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch ordered equipment'
     } as ApiResponse);
   }
 };
@@ -645,6 +724,145 @@ export const getLowStockAlerts = async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to get low stock alerts'
+    } as ApiResponse);
+  }
+};
+
+// Process inventory order for work order
+export const processInventoryOrder = async (req: AuthRequest, res: Response) => {
+  try {
+    const {
+      work_order_id,
+      items // Array of { item_id: string, quantity: number }
+    } = req.body;
+
+    const companyId = req.company?.id;
+    const userId = req.user?.id; // Get the user who is placing the order
+
+    if (!companyId) {
+      return res.status(403).json({
+        success: false,
+        error: 'No company context found'
+      } as ApiResponse);
+    }
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User authentication required'
+      } as ApiResponse);
+    }
+
+    // Validation
+    if (!work_order_id || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Work order ID and items array are required'
+      } as ApiResponse);
+    }
+
+    // Validate all items and check stock availability
+    const validationErrors: string[] = [];
+    const itemsToProcess: Array<{ id: string; quantity: number; current_stock: number; name: string; unit_price: number }> = [];
+
+    for (const item of items) {
+      if (!item.item_id || !item.quantity || item.quantity <= 0) {
+        validationErrors.push('All items must have valid item_id and positive quantity');
+        continue;
+      }
+
+      // Check if item exists and get current stock and price
+      const itemResult = await query(
+        'SELECT id, name, current_stock, unit_price FROM parts WHERE id = $1 AND company_id = $2',
+        [item.item_id, companyId]
+      );
+
+      if (itemResult.rows.length === 0) {
+        validationErrors.push(`Item with ID ${item.item_id} not found`);
+        continue;
+      }
+
+      const inventoryItem = itemResult.rows[0];
+      
+      if (inventoryItem.current_stock < item.quantity) {
+        validationErrors.push(`Insufficient stock for ${inventoryItem.name}. Available: ${inventoryItem.current_stock}, Requested: ${item.quantity}`);
+        continue;
+      }
+
+      itemsToProcess.push({
+        id: item.item_id,
+        quantity: item.quantity,
+        current_stock: inventoryItem.current_stock,
+        name: inventoryItem.name,
+        unit_price: inventoryItem.unit_price || 0
+      });
+    }
+
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: validationErrors.join('; ')
+      } as ApiResponse);
+    }
+
+    // Process the order - update stock levels and create order records
+    const orderResults = [];
+    
+    for (const item of itemsToProcess) {
+      const newStock = item.current_stock - item.quantity;
+      
+      // Update stock level
+      const updateResult = await query(
+        'UPDATE parts SET current_stock = $1, updated_at = NOW() WHERE id = $2 AND company_id = $3 RETURNING *',
+        [newStock, item.id, companyId]
+      );
+
+      if (updateResult.rows.length > 0) {
+        // Create order record in work_order_inventory_orders table
+        await query(
+          `INSERT INTO work_order_inventory_orders 
+           (work_order_id, part_id, quantity, unit_price, ordered_by, status, notes) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            work_order_id,
+            item.id,
+            item.quantity,
+            item.unit_price,
+            userId,
+            'ordered',
+            `Ordered ${item.quantity} units of ${item.name} for work order`
+          ]
+        );
+
+        orderResults.push({
+          item_id: item.id,
+          item_name: item.name,
+          quantity_ordered: item.quantity,
+          previous_stock: item.current_stock,
+          new_stock: newStock,
+          unit_price: item.unit_price,
+          total_price: item.quantity * item.unit_price
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        work_order_id,
+        order_summary: {
+          total_items: orderResults.length,
+          items: orderResults
+        },
+        message: `Successfully processed order for ${orderResults.length} item(s)`
+      }
+    } as ApiResponse);
+
+  } catch (error) {
+    console.error('Process inventory order error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to process inventory order'
     } as ApiResponse);
   }
 };

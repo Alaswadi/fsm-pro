@@ -141,8 +141,13 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // Start server
 const startServer = async () => {
   try {
-    // Connect to Redis
-    await connectRedis();
+    // Try to connect to Redis, but don't fail if it's not available
+    try {
+      await connectRedis();
+      console.log('✅ Redis connected successfully');
+    } catch (redisError) {
+      console.warn('⚠️ Redis connection failed, continuing without Redis:', redisError.message);
+    }
     
     app.listen(PORT, () => {
       console.log(`🚀 FSM API Server running on port ${PORT}`);

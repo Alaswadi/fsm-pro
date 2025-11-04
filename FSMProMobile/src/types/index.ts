@@ -146,18 +146,24 @@ export interface ApiError {
 // Inventory Types
 export interface InventoryItem {
   id: string;
+  company_id: string;
+  part_number: string;
   name: string;
   description?: string;
-  sku: string;
-  quantity: number;
+  category?: string;
+  equipment_type_id?: string;
   unit_price: number;
-  category: string;
-  supplier?: string;
-  location?: string;
-  min_stock_level?: number;
-  is_active: boolean;
+  cost_price?: number;
+  current_stock: number;
+  min_stock_level: number;
+  max_stock_level: number;
+  status: string;
+  supplier_info?: any;
+  compatible_equipment?: string[];
+  image_url?: string;
   created_at: string;
   updated_at: string;
+  equipment_type?: any;
 }
 
 // File Upload Types

@@ -12,9 +12,10 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Job } from '../src/types';
+import { Job, InventoryItem } from '../src/types';
 import { apiService } from '../src/services/api';
 import { ImagePickerButton } from '../src/components/ImagePickerButton';
+import { Toast } from '../src/components/Toast';
 
 export default function WorkOrderDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,6 +26,22 @@ export default function WorkOrderDetailsScreen() {
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [notes, setNotes] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<Job['status']>('scheduled');
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [selectedInventoryItems, setSelectedInventoryItems] = useState<{[key: string]: number}>({});
+  const [isLoadingInventory, setIsLoadingInventory] = useState(false);
+  const [isProcessingOrder, setIsProcessingOrder] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
+  
+  // Ordered equipment state
+  const [orderedEquipment, setOrderedEquipment] = useState<any[]>([]);
+  const [orderedEquipmentSummary, setOrderedEquipmentSummary] = useState<any>(null);
+  const [isLoadingOrderedEquipment, setIsLoadingOrderedEquipment] = useState(false);
+  
+  // Toast notification state
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
 
   useEffect(() => {
     if (id) {
@@ -43,6 +60,8 @@ export default function WorkOrderDetailsScreen() {
         setJob(response.data);
         setNotes(response.data.notes || '');
         setSelectedStatus(response.data.status);
+        // Load ordered equipment after job details are loaded
+        loadOrderedEquipment();
       } else {
         Alert.alert('Error', response.error || 'Failed to load job details');
         router.back();
@@ -52,6 +71,30 @@ export default function WorkOrderDetailsScreen() {
       router.back();
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadOrderedEquipment = async () => {
+    if (!id) return;
+    
+    try {
+      setIsLoadingOrderedEquipment(true);
+      const response = await apiService.getWorkOrderInventoryOrders(id);
+      
+      if (response.success && response.data) {
+        setOrderedEquipment(response.data.orders || []);
+        setOrderedEquipmentSummary(response.data.summary || null);
+      } else {
+        console.log('No ordered equipment found or error:', response.error);
+        setOrderedEquipment([]);
+        setOrderedEquipmentSummary(null);
+      }
+    } catch (error) {
+      console.error('Failed to load ordered equipment:', error);
+      setOrderedEquipment([]);
+      setOrderedEquipmentSummary(null);
+    } finally {
+      setIsLoadingOrderedEquipment(false);
     }
   };
 
@@ -97,11 +140,173 @@ export default function WorkOrderDetailsScreen() {
     }
   };
 
+  const loadInventory = async () => {
+    try {
+      setIsLoadingInventory(true);
+      const response = await apiService.getInventory();
+      
+      if (response.success && response.data) {
+        // Extract inventory_items array from the response data (same as inventory tab)
+        const inventoryItems = response.data.inventory_items || [];
+        setInventory(inventoryItems);
+      } else {
+        setInventory([]); // Reset to empty array on error
+        Alert.alert('Error', response.error || 'Failed to load inventory');
+      }
+    } catch (error) {
+      console.error('Error loading inventory:', error);
+      setInventory([]); // Reset to empty array on error
+      Alert.alert('Error', 'Failed to load inventory');
+    } finally {
+      setIsLoadingInventory(false);
+    }
+  };
+
+  const handleInventoryQuantityChange = (itemId: string, quantity: number) => {
+    setSelectedInventoryItems(prev => ({
+      ...prev,
+      [itemId]: quantity
+    }));
+  };
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    console.log('🍞 Showing toast:', { message, type, visible: true });
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+  };
+
+  const hideToast = () => {
+    console.log('🍞 Hiding toast');
+    setToastVisible(false);
+  };
+
+  const handleOrderInventory = async () => {
+    console.log('🛒 Starting order process...');
+    
+    // Clear any previous errors
+    setOrderError(null);
+    
+    // Prepare items to order
+    const itemsToOrder = Object.entries(selectedInventoryItems)
+      .filter(([_, quantity]) => quantity > 0)
+      .map(([itemId, quantity]) => {
+        const item = inventory.find(inv => inv.id === itemId);
+        return { item_id: itemId, quantity, item };
+      });
+
+    console.log('📦 Items to order:', itemsToOrder);
+
+    if (itemsToOrder.length === 0) {
+      showToast('Please select at least one item to order.', 'error');
+      return;
+    }
+
+    // Validate inventory availability
+    const insufficientStockItems = itemsToOrder.filter(orderItem => {
+      const inventoryItem = orderItem.item;
+      return inventoryItem && inventoryItem.stock_level < orderItem.quantity;
+    });
+
+    if (insufficientStockItems.length > 0) {
+      const itemNames = insufficientStockItems.map(item => item.item?.name).join(', ');
+      showToast(`Insufficient stock for: ${itemNames}. Please adjust quantities.`, 'error');
+      return;
+    }
+
+    // Start order processing
+    setIsProcessingOrder(true);
+    console.log('⏳ Processing order...');
+
+    try {
+      // Process the order
+      const orderData = {
+        work_order_id: id,
+        items: itemsToOrder.map(({ item_id, quantity }) => ({ item_id, quantity }))
+      };
+
+      console.log('📤 Sending order data:', orderData);
+      const response = await apiService.processInventoryOrder(orderData);
+      console.log('📥 Received response:', response);
+
+      if (response.success && response.data) {
+        console.log('✅ Order successful, updating inventory...');
+        
+        // Update local inventory state with new stock levels
+        const updatedInventory = inventory.map(item => {
+          const orderedItem = itemsToOrder.find(orderItem => orderItem.item_id === item.id);
+          if (orderedItem) {
+            return {
+              ...item,
+              stock_level: item.stock_level - orderedItem.quantity
+            };
+          }
+          return item;
+        });
+        setInventory(updatedInventory);
+
+        // Show success message with order details
+        const totalItems = response.data.order_summary?.total_items || itemsToOrder.length;
+        const orderedItems = response.data.order_summary?.items || [];
+        
+        // Calculate total value from ordered items
+        let totalValue = 0;
+        itemsToOrder.forEach((orderItem) => {
+          if (orderItem.item) {
+            totalValue += orderItem.item.unit_price * orderItem.quantity;
+          }
+        });
+        
+        console.log('💰 Calculated total value:', totalValue);
+        console.log('📊 Total items:', totalItems);
+        
+        // Show success toast
+        showToast(`✅ Order Placed Successfully! ${totalItems} item(s) ordered for $${totalValue.toFixed(2)}. Stock levels updated.`, 'success');
+        
+        // Refresh ordered equipment to show the new order
+        loadOrderedEquipment();
+        
+        // Close modal and reset selections after a short delay
+        setTimeout(() => {
+          console.log('🔄 Closing modal and resetting selections...');
+          setShowInventoryModal(false);
+          setSelectedInventoryItems({});
+        }, 1500); // Give time to read the toast
+        
+      } else {
+        console.error('❌ Order failed - response not successful:', response);
+        throw new Error(response.message || 'Failed to process order - invalid response');
+      }
+    } catch (error) {
+      console.error('💥 Order processing error:', error);
+      
+      // Set error state for display
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      setOrderError(errorMessage);
+      
+      // Show error toast
+      showToast(`❌ Order Failed: ${errorMessage}. Please try again.`, 'error');
+    } finally {
+      setIsProcessingOrder(false);
+      console.log('🏁 Order process completed');
+    }
+  };
+
   const getStatusColor = (status: Job['status']) => {
     switch (status) {
       case 'scheduled': return '#3B82F6';
       case 'in_progress': return '#F59E0B';
       case 'completed': return '#10B981';
+      case 'cancelled': return '#EF4444';
+      default: return '#6B7280';
+    }
+  };
+
+  const getOrderStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return '#F59E0B';
+      case 'ordered': return '#3B82F6';
+      case 'delivered': return '#10B981';
       case 'cancelled': return '#EF4444';
       default: return '#6B7280';
     }
@@ -239,6 +444,115 @@ export default function WorkOrderDetailsScreen() {
     </Modal>
   );
 
+  const renderInventoryModal = () => (
+    <Modal
+      visible={showInventoryModal}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setShowInventoryModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalContent, { height: '80%' }]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Order Inventory</Text>
+            <TouchableOpacity onPress={() => setShowInventoryModal(false)}>
+              <Ionicons name="close" size={24} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
+          
+          {isLoadingInventory ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#ea2a33" />
+              <Text style={styles.loadingText}>Loading inventory...</Text>
+            </View>
+          ) : (
+            <ScrollView style={styles.inventoryList}>
+              {Array.isArray(inventory) && inventory.length > 0 ? (
+                inventory.map((item) => (
+                  <View key={item.id} style={styles.inventoryItem}>
+                    <View style={styles.inventoryItemInfo}>
+                      <Text style={styles.inventoryItemName}>{item.name}</Text>
+                      <Text style={styles.inventoryItemDescription}>{item.description}</Text>
+                      <Text style={styles.inventoryItemStock}>Stock: {item.current_stock}</Text>
+                      <Text style={styles.inventoryItemPrice}>${Number(item.unit_price || 0).toFixed(2)}</Text>
+                    </View>
+                    <View style={styles.quantityContainer}>
+                      <TouchableOpacity
+                        style={styles.quantityButton}
+                        onPress={() => {
+                          const current = selectedInventoryItems[item.id] || 0;
+                          if (current > 0) {
+                            handleInventoryQuantityChange(item.id, current - 1);
+                          }
+                        }}
+                      >
+                        <Ionicons name="remove" size={20} color="#6B7280" />
+                      </TouchableOpacity>
+                      <Text style={styles.quantityText}>
+                        {selectedInventoryItems[item.id] || 0}
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.quantityButton}
+                        onPress={() => {
+                          const current = selectedInventoryItems[item.id] || 0;
+                          if (current < item.current_stock) {
+                            handleInventoryQuantityChange(item.id, current + 1);
+                          }
+                        }}
+                      >
+                        <Ionicons name="add" size={20} color="#6B7280" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyInventoryContainer}>
+                  <Ionicons name="cube-outline" size={48} color="#9CA3AF" />
+                  <Text style={styles.emptyInventoryText}>No inventory items available</Text>
+                  <Text style={styles.emptyInventorySubtext}>
+                    Please check back later or contact your administrator
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          )}
+          
+          {orderError && (
+            <View style={styles.orderErrorContainer}>
+              <Text style={styles.orderErrorText}>{orderError}</Text>
+            </View>
+          )}
+          
+          <View style={styles.modalActions}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setShowInventoryModal(false)}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.updateButton,
+                isProcessingOrder && styles.updateButtonDisabled
+              ]}
+              onPress={handleOrderInventory}
+              disabled={isProcessingOrder}
+            >
+              {isProcessingOrder ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color="white" style={{ marginRight: 8 }} />
+                  <Text style={styles.updateButtonText}>Processing...</Text>
+                </View>
+              ) : (
+                <Text style={styles.updateButtonText}>Place Order</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -345,6 +659,89 @@ export default function WorkOrderDetailsScreen() {
           />
         </View>
 
+        <View style={styles.inventorySection}>
+          <Text style={styles.sectionTitle}>Order Inventory</Text>
+          <Text style={styles.inventoryDescription}>
+            Order parts and materials needed for this work order
+          </Text>
+          <TouchableOpacity
+            style={styles.inventoryButton}
+            onPress={() => {
+              loadInventory();
+              setShowInventoryModal(true);
+            }}
+          >
+            <Ionicons name="cube-outline" size={24} color="#ea2a33" />
+            <Text style={styles.inventoryButtonText}>Browse Inventory</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.orderedEquipmentSection}>
+          <Text style={styles.sectionTitle}>Ordered Equipment</Text>
+          <Text style={styles.inventoryDescription}>
+            Equipment and parts ordered for this work order
+          </Text>
+          
+          {isLoadingOrderedEquipment ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#ea2a33" />
+              <Text style={styles.loadingText}>Loading ordered equipment...</Text>
+            </View>
+          ) : orderedEquipment.length > 0 ? (
+            <>
+              {orderedEquipmentSummary && (
+                <View style={styles.orderSummary}>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Total Items:</Text>
+                    <Text style={styles.summaryValue}>{orderedEquipmentSummary.total_items}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Total Value:</Text>
+                    <Text style={styles.summaryValue}>${Number(orderedEquipmentSummary.total_value || 0).toFixed(2)}</Text>
+                  </View>
+                </View>
+              )}
+              
+              <View style={styles.orderedItemsList}>
+                {orderedEquipment.map((order, index) => (
+                  <View key={index} style={styles.orderedItem}>
+                    <View style={styles.orderedItemHeader}>
+                      <View style={styles.orderedItemInfo}>
+                        <Text style={styles.orderedItemName}>{order.part_name}</Text>
+                        <Text style={styles.orderedItemDetails}>
+                          Qty: {order.quantity} × ${Number(order.unit_price || 0).toFixed(2)}
+                        </Text>
+                      </View>
+                      <Text style={styles.orderedItemTotal}>
+                        ${((order.quantity || 0) * Number(order.unit_price || 0)).toFixed(2)}
+                      </Text>
+                    </View>
+                    <View style={styles.orderedItemMeta}>
+                      <Text style={styles.orderedItemMetaText}>
+                        Ordered by {order.ordered_by_name} on {new Date(order.ordered_at).toLocaleDateString()}
+                      </Text>
+                      <View style={[styles.statusBadge, { backgroundColor: getOrderStatusColor(order.status) }]}>
+                        <Text style={styles.statusBadgeText}>{order.status}</Text>
+                      </View>
+                    </View>
+                    {order.notes && (
+                      <Text style={styles.orderedItemNotes}>Note: {order.notes}</Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+            </>
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="cube-outline" size={48} color="#9CA3AF" />
+              <Text style={styles.emptyStateText}>No equipment ordered yet</Text>
+              <Text style={styles.emptyStateSubtext}>
+                Use the "Browse Inventory" button above to order parts and materials
+              </Text>
+            </View>
+          )}
+        </View>
+
         <View style={styles.actionsSection}>
           <TouchableOpacity
             style={styles.actionButton}
@@ -366,6 +763,16 @@ export default function WorkOrderDetailsScreen() {
 
       {renderStatusModal()}
       {renderNotesModal()}
+      {renderInventoryModal()}
+      
+      {/* Toast Notification */}
+      <Toast
+        visible={toastVisible}
+        message={toastMessage}
+        type={toastType}
+        onHide={hideToast}
+        duration={3000}
+      />
     </ScrollView>
   );
 }
@@ -675,5 +1082,250 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: 'white',
+  },
+  inventorySection: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  inventoryDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  inventoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEF2F2',
+    borderColor: '#ea2a33',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  inventoryButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#ea2a33',
+  },
+  inventoryList: {
+    flex: 1,
+    marginVertical: 16,
+  },
+  inventoryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  inventoryItemInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  inventoryItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  inventoryItemDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  inventoryItemStock: {
+    fontSize: 12,
+    color: '#059669',
+    marginBottom: 2,
+  },
+  inventoryItemPrice: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ea2a33',
+  },
+  quantityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  quantityButton: {
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quantityText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    minWidth: 40,
+    textAlign: 'center',
+  },
+  emptyInventoryContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyInventoryText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyInventorySubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  orderErrorContainer: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginVertical: 12,
+  },
+  orderErrorText: {
+    fontSize: 14,
+    color: '#DC2626',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  // Ordered Equipment Styles
+  orderedEquipmentSection: {
+    backgroundColor: 'white',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  orderSummary: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  summaryValue: {
+    fontSize: 14,
+    color: '#111827',
+    fontWeight: '600',
+  },
+  orderedItemsList: {
+    marginTop: 8,
+  },
+  orderedItem: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ea2a33',
+  },
+  orderedItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  orderedItemInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  orderedItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  orderedItemDetails: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  orderedItemTotal: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ea2a33',
+  },
+  orderedItemMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  orderedItemMetaText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    flex: 1,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    color: 'white',
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  orderedItemNotes: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 20,
   },
 });
