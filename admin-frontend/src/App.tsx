@@ -17,6 +17,8 @@ import Equipment from './pages/Equipment';
 import Inventory from './pages/Inventory';
 import Settings from './pages/Settings';
 import WorkOrders from './pages/WorkOrders';
+import WorkshopQueue from './pages/WorkshopQueue';
+import WorkshopMetrics from './pages/WorkshopMetrics';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -61,6 +63,8 @@ const App: React.FC = () => {
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="work-orders" element={<WorkOrders />} />
+              <Route path="workshop-queue" element={<WorkshopQueue />} />
+              <Route path="workshop-metrics" element={<WorkshopMetrics />} />
               
               <Route path="technicians" element={<Technicians />} />
 

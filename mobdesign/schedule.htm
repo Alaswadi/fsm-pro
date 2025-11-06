@@ -1,0 +1,1151 @@
+<html lang="en"><head><script>
+(function(){
+  let proxyEcharts = null;
+
+  let originInit = null;
+
+  const DefaultFontOptions = [
+      { key: 'xAxis', stylePath: 'xAxis.axisLabel' },
+      { key: 'yAxis', stylePath: 'yAxis.axisLabel' },
+      { key: 'legend', stylePath: 'legend.textStyle' },
+      { key: 'tooltip', stylePath: 'tooltip.textStyle' },
+      { key: 'title', stylePath: 'title.textStyle' },
+      { key: 'series', stylePath: 'series.n.label', isArray: true },
+  ];
+
+  function setVal(source, keys, val, setFn) {
+      if (!Array.isArray(keys)) {
+          keys = keys.split('.');
+      }
+      keys = [...keys];
+      const valKey = keys.pop();
+      while (keys.length) {
+          const parentKey = keys.shift();
+          if (typeof source[parentKey] !== 'object' && typeof source[parentKey] !== 'function') {
+              const childKey = keys[0] === undefined ? valKey : keys[0];
+              let newVal = {};
+              if (!isNaN(childKey * 1)) {
+                  newVal = [];
+              }
+              if (setFn) {
+                  setFn(source, parentKey, newVal);
+              } else {
+                  source[parentKey] = newVal;
+              }
+          }
+          source = source[parentKey];
+      }
+      if (setFn) {
+          setFn(source, valKey, val);
+      } else {
+          source[valKey] = val;
+      }
+  }
+
+  function setFontFamily(options) {
+      return options;
+  }
+
+  function setSeriesFamily(options) {
+      if (options.series) {
+          options.series = options.series.map(item => {
+              item.label = { ...item.label };
+              return item;
+          });
+      }
+      return options;
+  }
+
+
+  function addResizeListener(echartsInstance) {
+      const mountDom = echartsInstance.getDom();
+      const resizeObserver = new ResizeObserver(() => {
+          echartsInstance.resize();
+      });
+      resizeObserver.observe(mountDom);
+      return resizeObserver;
+  }
+
+  function proxyInit(...arg) {
+      if (!originInit) return null;
+      let instance = null;
+      try {
+        instance = originInit.apply(this, arg);
+      } catch (e) {
+        console.error(e);
+        const div = document.createElement('div');
+        div.style.display = 'none';
+        document.body.appendChild(div);
+        instance = originInit.call(this, div);
+        document.body.removeChild(div);
+      }
+      const originSetOption = instance.setOption;
+      addResizeListener(instance);
+      instance.setOption = async function setOptionProxy(options) {
+          options = options || {};
+          options.animation = false;
+          try {
+            return originSetOption.call(this, options);
+          } catch (e) {
+            console.error(e);
+            return originSetOption.call(this, {});
+          }
+      };
+      return instance;
+  }
+
+  Object.defineProperty(globalThis, 'echarts', {
+      get() {
+          return proxyEcharts;
+      },
+      set(value) {
+          originInit = value.init;
+          defineInit(value);
+          proxyEcharts = value;
+      },
+      configurable: true,
+  });
+
+  function defineInit(value) {
+      Object.defineProperty(value, 'init', {
+          get() {
+              return proxyInit;
+          },
+          set(v) {
+              originInit = v;
+          },
+          enumerable: true,
+      });
+  }
+})()
+</script><script>console.warn = () => {};console.log = () => {};</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FSM Pro - Schedule</title>
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Pacifico&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.6.0/remixicon.min.css">
+<script>
+tailwind.config = {
+theme: {
+extend: {
+colors: {
+primary: '#3B82F6',
+secondary: '#1E40AF'
+},
+borderRadius: {
+'none': '0px',
+'sm': '4px',
+DEFAULT: '8px',
+'md': '12px',
+'lg': '16px',
+'xl': '20px',
+'2xl': '24px',
+'3xl': '32px',
+'full': '9999px',
+'button': '8px'
+}
+}
+}
+}
+</script>
+<style>
+:where([class^="ri-"])::before {
+content: "\f3c2";
+}
+.calendar-day {
+transition: all 0.2s ease;
+}
+.calendar-day:hover {
+background-color: #f3f4f6;
+}
+.calendar-day.today {
+background-color: #3B82F6;
+color: white;
+}
+.calendar-day.selected {
+background-color: #1E40AF;
+color: white;
+}
+.appointment-block {
+border-left: 4px solid;
+transition: all 0.2s ease;
+}
+.appointment-block:hover {
+transform: translateY(-1px);
+box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+.bottom-sheet {
+transform: translateY(100%);
+transition: transform 0.3s ease;
+}
+.bottom-sheet.open {
+transform: translateY(0);
+}
+.slide-in {
+animation: slideIn 0.3s ease-out;
+}
+@keyframes slideIn {
+from { transform: translateY(20px); opacity: 0; }
+to { transform: translateY(0); opacity: 1; }
+}
+.fade-in {
+animation: fadeIn 0.4s ease-out;
+}
+@keyframes fadeIn {
+from { opacity: 0; }
+to { opacity: 1; }
+}
+</style>
+<script>
+    // window.setInterval = () => {};
+    // window.clearInterval = () => {};
+    // window.setTimeout = () => {};
+    // window.clearTimeout = () => {};
+  </script><style>
+    /* 自定义滚动条样式 */
+    /* WebKit 浏览器 (Chrome, Safari, Edge) */
+    ::-webkit-scrollbar {
+        width: 0; /* 滚动条宽度 */
+        height: 0; /* 水平滚动条高度 */
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent; /* 轨道透明，使内容可见 */
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.5); /* 滚动条滑块颜色 */
+        border-radius: 4px; /* 滑块圆角 */
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(0, 0, 0, 0.7); /* 悬停时颜色 */
+    }
+  </style><script>
+  window.addEventListener('load', () => {
+    if (typeof AOS !== 'undefined' && AOS) {
+      AOS.refresh?.();
+    }
+  });
+</script><script>(function () {
+  // 内存存储
+  const memoryStorage = {
+    local: new Map(),
+    session: new Map()
+  };
+
+  // 保存原始方法
+  // const originalLocalStorage = {
+  //   setItem: localStorage.setItem.bind(localStorage),
+  //   getItem: localStorage.getItem.bind(localStorage),
+  //   removeItem: localStorage.removeItem.bind(localStorage),
+  //   clear: localStorage.clear.bind(localStorage),
+  //   key: localStorage.key.bind(localStorage)
+  // };
+
+  // const originalSessionStorage = {
+  //   setItem: sessionStorage.setItem.bind(sessionStorage),
+  //   getItem: sessionStorage.getItem.bind(sessionStorage),
+  //   removeItem: sessionStorage.removeItem.bind(sessionStorage),
+  //   clear: sessionStorage.clear.bind(sessionStorage),
+  //   key: sessionStorage.key.bind(sessionStorage)
+  // };
+
+  // 只重写方法，不动属性
+  localStorage.setItem = function (key, value) {
+    memoryStorage.local.set(key, value);
+  };
+
+  localStorage.getItem = function (key) {
+    return memoryStorage.local.get(key) ?? null;
+  };
+
+  localStorage.removeItem = function (key) {
+    memoryStorage.local.delete(key);
+  };
+
+  localStorage.clear = function () {
+    memoryStorage.local.clear();
+  };
+
+  localStorage.key = function (n) {
+    return Array.from(memoryStorage.local.keys())[n] ?? null;
+  };
+
+  // sessionStorage 同样的处理
+  sessionStorage.setItem = function (key, value) {
+    memoryStorage.session.set(key, value);
+  };
+
+  sessionStorage.getItem = function (key) {
+    return memoryStorage.session.get(key) ?? null;
+  };
+
+  sessionStorage.removeItem = function (key) {
+    memoryStorage.session.delete(key);
+  };
+
+  sessionStorage.clear = function () {
+    memoryStorage.session.clear();
+  };
+
+  sessionStorage.key = function (n) {
+    return Array.from(memoryStorage.session.keys())[n] ?? null;
+  };
+})();
+</script><style>*, ::before, ::after{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/* ! tailwindcss v3.4.16 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}.inset-0{inset:0px}.bottom-0{bottom:0px}.bottom-24{bottom:6rem}.left-0{left:0px}.right-0{right:0px}.right-4{right:1rem}.top-0{top:0px}.z-40{z-index:40}.z-50{z-index:50}.mx-auto{margin-left:auto;margin-right:auto}.mb-2{margin-bottom:0.5rem}.mb-4{margin-bottom:1rem}.mb-6{margin-bottom:1.5rem}.mr-2{margin-right:0.5rem}.mt-2{margin-top:0.5rem}.flex{display:flex}.grid{display:grid}.hidden{display:none}.h-1{height:0.25rem}.h-10{height:2.5rem}.h-12{height:3rem}.h-14{height:3.5rem}.h-16{height:4rem}.h-6{height:1.5rem}.h-8{height:2rem}.w-10{width:2.5rem}.w-12{width:3rem}.w-14{width:3.5rem}.w-6{width:1.5rem}.w-8{width:2rem}.w-full{width:100%}.flex-1{flex:1 1 0%}.flex-shrink-0{flex-shrink:0}.cursor-pointer{cursor:pointer}.grid-cols-5{grid-template-columns:repeat(5, minmax(0, 1fr))}.grid-cols-7{grid-template-columns:repeat(7, minmax(0, 1fr))}.grid-cols-8{grid-template-columns:repeat(8, minmax(0, 1fr))}.flex-col{flex-direction:column}.items-center{align-items:center}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.gap-1{gap:0.25rem}.space-x-2 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(0.5rem * var(--tw-space-x-reverse));margin-left:calc(0.5rem * calc(1 - var(--tw-space-x-reverse)))}.space-x-3 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(0.75rem * var(--tw-space-x-reverse));margin-left:calc(0.75rem * calc(1 - var(--tw-space-x-reverse)))}.space-y-1 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.25rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.25rem * var(--tw-space-y-reverse))}.space-y-2 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.5rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.5rem * var(--tw-space-y-reverse))}.space-y-3 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.75rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.75rem * var(--tw-space-y-reverse))}.overflow-x-auto{overflow-x:auto}.\!rounded-button{border-radius:8px !important}.rounded-full{border-radius:9999px}.rounded-lg{border-radius:16px}.rounded-md{border-radius:12px}.rounded-t-xl{border-top-left-radius:20px;border-top-right-radius:20px}.border{border-width:1px}.border-t{border-top-width:1px}.border-gray-200{--tw-border-opacity:1;border-color:rgb(229 231 235 / var(--tw-border-opacity, 1))}.bg-black{--tw-bg-opacity:1;background-color:rgb(0 0 0 / var(--tw-bg-opacity, 1))}.bg-gray-100{--tw-bg-opacity:1;background-color:rgb(243 244 246 / var(--tw-bg-opacity, 1))}.bg-gray-300{--tw-bg-opacity:1;background-color:rgb(209 213 219 / var(--tw-bg-opacity, 1))}.bg-gray-50{--tw-bg-opacity:1;background-color:rgb(249 250 251 / var(--tw-bg-opacity, 1))}.bg-primary{--tw-bg-opacity:1;background-color:rgb(59 130 246 / var(--tw-bg-opacity, 1))}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity, 1))}.bg-opacity-50{--tw-bg-opacity:0.5}.p-1{padding:0.25rem}.p-4{padding:1rem}.px-1{padding-left:0.25rem;padding-right:0.25rem}.px-4{padding-left:1rem;padding-right:1rem}.py-1{padding-top:0.25rem;padding-bottom:0.25rem}.py-2{padding-top:0.5rem;padding-bottom:0.5rem}.py-3{padding-top:0.75rem;padding-bottom:0.75rem}.py-4{padding-top:1rem;padding-bottom:1rem}.pb-20{padding-bottom:5rem}.pt-16{padding-top:4rem}.text-center{text-align:center}.font-sans{font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:0.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:0.75rem;line-height:1rem}.font-medium{font-weight:500}.font-semibold{font-weight:600}.text-gray-300{--tw-text-opacity:1;color:rgb(209 213 219 / var(--tw-text-opacity, 1))}.text-gray-400{--tw-text-opacity:1;color:rgb(156 163 175 / var(--tw-text-opacity, 1))}.text-gray-500{--tw-text-opacity:1;color:rgb(107 114 128 / var(--tw-text-opacity, 1))}.text-gray-600{--tw-text-opacity:1;color:rgb(75 85 99 / var(--tw-text-opacity, 1))}.text-gray-700{--tw-text-opacity:1;color:rgb(55 65 81 / var(--tw-text-opacity, 1))}.text-gray-900{--tw-text-opacity:1;color:rgb(17 24 39 / var(--tw-text-opacity, 1))}.text-primary{--tw-text-opacity:1;color:rgb(59 130 246 / var(--tw-text-opacity, 1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.shadow-lg{--tw-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-sm{--tw-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.transition-all{transition-property:all;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.hover\:bg-gray-100:hover{--tw-bg-opacity:1;background-color:rgb(243 244 246 / var(--tw-bg-opacity, 1))}</style></head>
+<body class="bg-gray-50 font-sans">
+<header class="fixed top-0 w-full bg-white shadow-sm z-50">
+<div class="flex items-center justify-between px-4 py-3">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 flex items-center justify-center cursor-pointer">
+<i class="ri-menu-line text-xl text-gray-700"></i>
+</div>
+<h1 class="text-lg font-semibold text-gray-900">Schedule</h1>
+</div>
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 flex items-center justify-center cursor-pointer">
+<i class="ri-notification-line text-xl text-gray-700"></i>
+</div>
+<div class="w-8 h-8 flex items-center justify-center cursor-pointer">
+<i class="ri-user-line text-xl text-gray-700"></i>
+</div>
+</div>
+</div>
+</header>
+<main class="pt-16 pb-20">
+<div class="px-4 py-4">
+<div class="flex bg-gray-100 rounded-lg p-1 mb-4">
+<button id="dayView" class="flex-1 px-1 py-1 text-sm font-medium rounded-md transition-all cursor-pointer">Day</button>
+<button id="weekView" class="flex-1 px-1 py-1 text-sm font-medium rounded-md transition-all cursor-pointer">Week</button>
+<button id="monthView" class="flex-1 px-1 py-1 text-sm font-medium rounded-md transition-all cursor-pointer bg-white text-gray-900 shadow-sm">Month</button>
+</div>
+<div class="flex items-center justify-between mb-6">
+<button id="prevPeriod" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 cursor-pointer">
+<i class="ri-arrow-left-line text-gray-600"></i>
+</button>
+<h2 id="currentPeriod" class="text-xl font-semibold text-gray-900">November 2025</h2>
+<button id="nextPeriod" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 cursor-pointer">
+<i class="ri-arrow-right-line text-gray-600"></i>
+</button>
+</div>
+<div class="flex space-x-2 mb-6 overflow-x-auto scrollbar-hide">
+<button class="flex-shrink-0 px-4 py-2 bg-primary text-white rounded-full text-sm font-medium cursor-pointer !rounded-button">
+All
+</button>
+<button class="flex-shrink-0 px-4 py-2 bg-white text-gray-600 border border-gray-200 rounded-full text-sm font-medium cursor-pointer !rounded-button">
+High Priority
+</button>
+<button class="flex-shrink-0 px-4 py-2 bg-white text-gray-600 border border-gray-200 rounded-full text-sm font-medium cursor-pointer !rounded-button">
+Maintenance
+</button>
+<button class="flex-shrink-0 px-4 py-2 bg-white text-gray-600 border border-gray-200 rounded-full text-sm font-medium cursor-pointer !rounded-button">
+Inspection
+</button>
+<button class="flex-shrink-0 px-4 py-2 bg-white text-gray-600 border border-gray-200 rounded-full text-sm font-medium cursor-pointer !rounded-button">
+Emergency
+</button>
+</div>
+</div>
+<div id="calendarContainer" class="px-4 mb-6">
+<div id="monthViewContainer" class="bg-white rounded-lg shadow-sm p-4">
+<div class="grid grid-cols-7 gap-1 mb-2">
+<div class="text-center text-xs font-medium text-gray-500 py-2">Sun</div>
+<div class="text-center text-xs font-medium text-gray-500 py-2">Mon</div>
+<div class="text-center text-xs font-medium text-gray-500 py-2">Tue</div>
+<div class="text-center text-xs font-medium text-gray-500 py-2">Wed</div>
+<div class="text-center text-xs font-medium text-gray-500 py-2">Thu</div>
+<div class="text-center text-xs font-medium text-gray-500 py-2">Fri</div>
+<div class="text-center text-xs font-medium text-gray-500 py-2">Sat</div>
+</div>
+<div id="calendarGrid" class="grid grid-cols-7 gap-1"><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-300">
+<span class="font-medium">26</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-300">
+<span class="font-medium">27</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-300">
+<span class="font-medium">28</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-300">
+<span class="font-medium">29</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-300">
+<span class="font-medium">30</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-300">
+<span class="font-medium">31</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">1</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">2</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">3</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">4</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900 today">
+<span class="font-medium">5</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">6</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">7</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">8</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">9</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">10</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">11</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">12</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">13</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">14</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">15</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">16</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">17</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">18</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">19</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">20</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">21</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">22</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">23</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">24</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">25</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">26</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">27</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">28</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">29</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-900">
+<span class="font-medium">30</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-300">
+<span class="font-medium">1</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-300">
+<span class="font-medium">2</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-300">
+<span class="font-medium">3</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-300">
+<span class="font-medium">4</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-300">
+<span class="font-medium">5</span>
+
+</div><div class="calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative text-gray-300">
+<span class="font-medium">6</span>
+
+</div></div>
+</div>
+<div id="dayViewContainer" class="bg-white rounded-lg shadow-sm p-4 hidden">
+<div id="daySchedule" class="space-y-2">
+</div>
+</div>
+<div id="weekViewContainer" class="bg-white rounded-lg shadow-sm p-4 hidden">
+<div class="grid grid-cols-8 gap-1 text-xs">
+<div class="text-center font-medium text-gray-500 py-2">Time</div>
+<div class="text-center font-medium text-gray-500 py-2">Sun</div>
+<div class="text-center font-medium text-gray-500 py-2">Mon</div>
+<div class="text-center font-medium text-gray-500 py-2">Tue</div>
+<div class="text-center font-medium text-gray-500 py-2">Wed</div>
+<div class="text-center font-medium text-gray-500 py-2">Thu</div>
+<div class="text-center font-medium text-gray-500 py-2">Fri</div>
+<div class="text-center font-medium text-gray-500 py-2">Sat</div>
+</div>
+<div id="weekSchedule" class="mt-2">
+</div>
+</div>
+</div>
+<div class="px-4 mb-6">
+<div class="flex space-x-3">
+<button id="addAppointmentBtn" class="flex-1 bg-primary text-white py-3 px-4 rounded-lg font-medium cursor-pointer !rounded-button">
+<i class="ri-add-line mr-2"></i>Add New Appointment
+</button>
+<a href="https://readdy.ai/home/b6fe40ca-771d-48ff-a2fd-0c4fd884e51a/a613ccd6-16e4-4a8a-a15c-71e4939d2693" data-readdy="true" class="flex-1 bg-white text-gray-700 border border-gray-200 py-3 px-4 rounded-lg font-medium text-center cursor-pointer !rounded-button">
+View All Orders
+</a>
+</div>
+</div>
+<div class="px-4">
+<h3 class="text-lg font-semibold text-gray-900 mb-4">Upcoming Appointments</h3>
+<div id="upcomingList" class="space-y-3"></div>
+</div>
+</main>
+<nav class="fixed bottom-0 w-full bg-white border-t border-gray-200 z-50">
+<div class="grid grid-cols-5 h-16">
+<a href="https://readdy.ai/home/b6fe40ca-771d-48ff-a2fd-0c4fd884e51a/a613ccd6-16e4-4a8a-a15c-71e4939d2693" data-readdy="true" class="flex flex-col items-center justify-center space-y-1 cursor-pointer">
+<div class="w-6 h-6 flex items-center justify-center">
+<i class="ri-file-list-line text-gray-400"></i>
+</div>
+<span class="text-xs text-gray-400">Orders</span>
+</a>
+<button class="flex flex-col items-center justify-center space-y-1 cursor-pointer">
+<div class="w-6 h-6 flex items-center justify-center">
+<i class="ri-calendar-line text-primary"></i>
+</div>
+<span class="text-xs text-primary font-medium">Schedule</span>
+</button>
+<a href="https://readdy.ai/home/b6fe40ca-771d-48ff-a2fd-0c4fd884e51a/0fb84214-f278-4157-a15d-8598b8f6f2f5" data-readdy="true" class="flex flex-col items-center justify-center space-y-1 cursor-pointer">
+<div class="w-6 h-6 flex items-center justify-center">
+<i class="ri-box-line text-gray-400"></i>
+</div>
+<span class="text-xs text-gray-400">Inventory</span>
+</a>
+<button class="flex flex-col items-center justify-center space-y-1 cursor-pointer">
+<div class="w-6 h-6 flex items-center justify-center">
+<i class="ri-map-pin-line text-gray-400"></i>
+</div>
+<span class="text-xs text-gray-400">Tracking</span>
+</button>
+<button class="flex flex-col items-center justify-center space-y-1 cursor-pointer">
+<div class="w-6 h-6 flex items-center justify-center">
+<i class="ri-user-line text-gray-400"></i>
+</div>
+<span class="text-xs text-gray-400">Profile</span>
+</button>
+</div>
+</nav>
+<button id="fabButton" class="fixed bottom-24 right-4 w-14 h-14 bg-primary text-white rounded-full shadow-lg flex items-center justify-center cursor-pointer z-40">
+<i class="ri-add-fill text-xl"></i>
+</button>
+<div id="appointmentModal" class="fixed inset-0 z-50 hidden">
+<div class="absolute inset-0 bg-black bg-opacity-50" id="modalOverlay"></div>
+<div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-xl bottom-sheet">
+<div class="p-4">
+<div class="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
+<div id="modalContent">
+</div>
+</div>
+</div>
+</div>
+<script id="calendarData">
+const appointments = [
+{
+id: 'APT-001',
+workOrderId: 'WO-2024-001',
+title: 'HVAC System Maintenance',
+location: 'Downtown Office Complex',
+date: '2024-12-15',
+time: '09:00',
+duration: 120,
+priority: 'High',
+status: 'Scheduled',
+technician: 'John Smith',
+customer: 'Metro Corp',
+type: 'Maintenance'
+},
+{
+id: 'APT-002',
+workOrderId: 'WO-2024-002',
+title: 'Elevator Inspection',
+location: 'Riverside Mall',
+date: '2024-12-16',
+time: '14:30',
+duration: 90,
+priority: 'Medium',
+status: 'Scheduled',
+technician: 'Sarah Johnson',
+customer: 'Mall Management',
+type: 'Inspection'
+},
+{
+id: 'APT-003',
+workOrderId: 'WO-2024-003',
+title: 'Emergency Repair',
+location: 'City Hospital',
+date: '2024-12-14',
+time: '16:00',
+duration: 180,
+priority: 'Critical',
+status: 'In Progress',
+technician: 'Mike Davis',
+customer: 'City Hospital',
+type: 'Emergency'
+},
+{
+id: 'APT-004',
+workOrderId: 'WO-2024-004',
+title: 'Plumbing Maintenance',
+location: 'Tech Park Building A',
+date: '2024-12-17',
+time: '10:00',
+duration: 60,
+priority: 'Low',
+status: 'Scheduled',
+technician: 'Lisa Wilson',
+customer: 'Tech Solutions Inc',
+type: 'Maintenance'
+},
+{
+id: 'APT-005',
+workOrderId: 'WO-2024-005',
+title: 'Safety Inspection',
+location: 'Manufacturing Plant',
+date: '2024-12-18',
+time: '08:00',
+duration: 240,
+priority: 'High',
+status: 'Scheduled',
+technician: 'Robert Brown',
+customer: 'Industrial Corp',
+type: 'Inspection'
+}
+];
+let currentView = 'month';
+let currentDate = new Date();
+let selectedDate = new Date();
+</script>
+<script id="calendarRenderer">
+function renderCalendar() {
+const calendarGrid = document.getElementById('calendarGrid');
+const currentPeriod = document.getElementById('currentPeriod');
+if (currentView === 'month') {
+currentPeriod.textContent = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+renderMonthView();
+} else if (currentView === 'week') {
+const weekStart = getWeekStart(currentDate);
+const weekEnd = new Date(weekStart);
+weekEnd.setDate(weekEnd.getDate() + 6);
+currentPeriod.textContent = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+renderWeekView();
+} else {
+currentPeriod.textContent = currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+renderDayView();
+}
+}
+function renderMonthView() {
+const calendarGrid = document.getElementById('calendarGrid');
+calendarGrid.innerHTML = '';
+const year = currentDate.getFullYear();
+const month = currentDate.getMonth();
+const firstDay = new Date(year, month, 1);
+const lastDay = new Date(year, month + 1, 0);
+const startDate = new Date(firstDay);
+startDate.setDate(startDate.getDate() - firstDay.getDay());
+for (let i = 0; i < 42; i++) {
+const date = new Date(startDate);
+date.setDate(startDate.getDate() + i);
+const dayElement = document.createElement('div');
+dayElement.className = 'calendar-day h-12 flex flex-col items-center justify-center text-sm cursor-pointer rounded-md relative';
+if (date.getMonth() !== month) {
+dayElement.classList.add('text-gray-300');
+} else {
+dayElement.classList.add('text-gray-900');
+}
+if (isToday(date)) {
+dayElement.classList.add('today');
+}
+const dayAppointments = getAppointmentsForDate(date);
+dayElement.innerHTML = `
+<span class="font-medium">${date.getDate()}</span>
+${dayAppointments.length > 0 ? `<div class="w-1 h-1 bg-primary rounded-full mt-1"></div>` : ''}
+`;
+dayElement.addEventListener('click', () => {
+selectedDate = new Date(date);
+showDayAppointments(date);
+});
+calendarGrid.appendChild(dayElement);
+}
+}
+function renderWeekView() {
+const weekSchedule = document.getElementById('weekSchedule');
+weekSchedule.innerHTML = '';
+const weekStart = getWeekStart(currentDate);
+const hours = Array.from({length: 12}, (_, i) => i + 8);
+hours.forEach(hour => {
+const row = document.createElement('div');
+row.className = 'grid grid-cols-8 gap-1 border-b border-gray-100 py-2';
+const timeCell = document.createElement('div');
+timeCell.className = 'text-xs text-gray-500 text-center';
+timeCell.textContent = `${hour}:00`;
+row.appendChild(timeCell);
+for (let day = 0; day < 7; day++) {
+const date = new Date(weekStart);
+date.setDate(weekStart.getDate() + day);
+const cell = document.createElement('div');
+cell.className = 'min-h-8 text-xs relative';
+const dayAppointments = getAppointmentsForDate(date).filter(apt => {
+const aptHour = parseInt(apt.time.split(':')[0]);
+return aptHour === hour;
+});
+dayAppointments.forEach(apt => {
+const block = document.createElement('div');
+block.className = 'appointment-block bg-blue-50 border-blue-400 p-1 rounded text-xs cursor-pointer';
+block.innerHTML = `<div class="font-medium truncate">${apt.title}</div>`;
+block.addEventListener('click', () => showAppointmentDetails(apt));
+cell.appendChild(block);
+});
+row.appendChild(cell);
+}
+weekSchedule.appendChild(row);
+});
+}
+function renderDayView() {
+const daySchedule = document.getElementById('daySchedule');
+daySchedule.innerHTML = '';
+const dayAppointments = getAppointmentsForDate(currentDate);
+const hours = Array.from({length: 12}, (_, i) => i + 8);
+hours.forEach(hour => {
+const hourBlock = document.createElement('div');
+hourBlock.className = 'flex border-b border-gray-100 py-3';
+const timeLabel = document.createElement('div');
+timeLabel.className = 'w-16 text-sm text-gray-500 font-medium';
+timeLabel.textContent = `${hour}:00`;
+const appointmentArea = document.createElement('div');
+appointmentArea.className = 'flex-1 ml-4 space-y-2';
+const hourAppointments = dayAppointments.filter(apt => {
+const aptHour = parseInt(apt.time.split(':')[0]);
+return aptHour === hour;
+});
+hourAppointments.forEach(apt => {
+const block = document.createElement('div');
+block.className = 'appointment-block bg-white border border-gray-200 p-3 rounded-lg cursor-pointer';
+block.style.borderLeftColor = getPriorityColor(apt.priority);
+block.innerHTML = `
+<div class="font-semibold text-gray-900">${apt.title}</div>
+<div class="text-sm text-gray-600">${apt.location}</div>
+<div class="text-xs text-gray-500 mt-1">${apt.time} - ${apt.technician}</div>
+`;
+block.addEventListener('click', () => showAppointmentDetails(apt));
+appointmentArea.appendChild(block);
+});
+hourBlock.appendChild(timeLabel);
+hourBlock.appendChild(appointmentArea);
+daySchedule.appendChild(hourBlock);
+});
+}
+function getAppointmentsForDate(date) {
+const dateStr = date.toISOString().split('T')[0];
+return appointments.filter(apt => apt.date === dateStr);
+}
+function isToday(date) {
+const today = new Date();
+return date.toDateString() === today.toDateString();
+}
+function getWeekStart(date) {
+const start = new Date(date);
+start.setDate(date.getDate() - date.getDay());
+return start;
+}
+function getPriorityColor(priority) {
+switch (priority) {
+case 'Critical': return '#EF4444';
+case 'High': return '#F59E0B';
+case 'Medium': return '#3B82F6';
+case 'Low': return '#10B981';
+default: return '#6B7280';
+}
+}
+</script>
+<script id="upcomingAppointments">
+function renderUpcomingAppointments() {
+const upcomingList = document.getElementById('upcomingList');
+const today = new Date();
+const nextWeek = new Date(today);
+nextWeek.setDate(today.getDate() + 7);
+const upcoming = appointments
+.filter(apt => {
+const aptDate = new Date(apt.date);
+return aptDate >= today && aptDate <= nextWeek;
+})
+.sort((a, b) => new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time))
+.slice(0, 5);
+upcomingList.innerHTML = '';
+upcoming.forEach((apt, index) => {
+const item = document.createElement('div');
+item.className = 'bg-white rounded-lg p-4 shadow-sm slide-in cursor-pointer';
+item.style.animationDelay = `${index * 0.1}s`;
+const priorityColor = getPriorityColor(apt.priority);
+const statusColor = getStatusColor(apt.status);
+item.innerHTML = `
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-semibold text-gray-900">${apt.title}</h4>
+<span class="px-2 py-1 rounded-full text-xs font-medium ${statusColor}">${apt.status}</span>
+</div>
+<div class="text-sm text-gray-600 mb-2">${apt.location}</div>
+<div class="flex justify-between items-center">
+<div class="flex items-center space-x-2">
+<div class="w-2 h-2 rounded-full" style="background-color: ${priorityColor}"></div>
+<span class="text-xs text-gray-500">${apt.workOrderId}</span>
+</div>
+<span class="text-xs text-gray-500">${formatDateTime(apt.date, apt.time)}</span>
+</div>
+`;
+item.addEventListener('click', () => showAppointmentDetails(apt));
+upcomingList.appendChild(item);
+});
+}
+function getStatusColor(status) {
+switch (status) {
+case 'Scheduled': return 'bg-blue-100 text-blue-800';
+case 'In Progress': return 'bg-yellow-100 text-yellow-800';
+case 'Completed': return 'bg-green-100 text-green-800';
+case 'Cancelled': return 'bg-red-100 text-red-800';
+default: return 'bg-gray-100 text-gray-800';
+}
+}
+function formatDateTime(date, time) {
+const d = new Date(date);
+const today = new Date();
+const tomorrow = new Date(today);
+tomorrow.setDate(today.getDate() + 1);
+if (d.toDateString() === today.toDateString()) {
+return `Today ${time}`;
+} else if (d.toDateString() === tomorrow.toDateString()) {
+return `Tomorrow ${time}`;
+} else {
+return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${time}`;
+}
+}
+</script>
+<script id="viewSwitcher">
+document.addEventListener('DOMContentLoaded', function() {
+const dayViewBtn = document.getElementById('dayView');
+const weekViewBtn = document.getElementById('weekView');
+const monthViewBtn = document.getElementById('monthView');
+const monthContainer = document.getElementById('monthViewContainer');
+const weekContainer = document.getElementById('weekViewContainer');
+const dayContainer = document.getElementById('dayViewContainer');
+function switchView(view) {
+currentView = view;
+[dayViewBtn, weekViewBtn, monthViewBtn].forEach(btn => {
+btn.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
+btn.classList.add('text-gray-600');
+});
+[monthContainer, weekContainer, dayContainer].forEach(container => {
+container.classList.add('hidden');
+});
+if (view === 'day') {
+dayViewBtn.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
+dayViewBtn.classList.remove('text-gray-600');
+dayContainer.classList.remove('hidden');
+} else if (view === 'week') {
+weekViewBtn.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
+weekViewBtn.classList.remove('text-gray-600');
+weekContainer.classList.remove('hidden');
+} else {
+monthViewBtn.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
+monthViewBtn.classList.remove('text-gray-600');
+monthContainer.classList.remove('hidden');
+}
+renderCalendar();
+}
+dayViewBtn.addEventListener('click', () => switchView('day'));
+weekViewBtn.addEventListener('click', () => switchView('week'));
+monthViewBtn.addEventListener('click', () => switchView('month'));
+document.getElementById('prevPeriod').addEventListener('click', () => {
+if (currentView === 'month') {
+currentDate.setMonth(currentDate.getMonth() - 1);
+} else if (currentView === 'week') {
+currentDate.setDate(currentDate.getDate() - 7);
+} else {
+currentDate.setDate(currentDate.getDate() - 1);
+}
+renderCalendar();
+});
+document.getElementById('nextPeriod').addEventListener('click', () => {
+if (currentView === 'month') {
+currentDate.setMonth(currentDate.getMonth() + 1);
+} else if (currentView === 'week') {
+currentDate.setDate(currentDate.getDate() + 7);
+} else {
+currentDate.setDate(currentDate.getDate() + 1);
+}
+renderCalendar();
+});
+renderCalendar();
+renderUpcomingAppointments();
+});
+</script>
+<script id="modalHandler">
+function showAppointmentDetails(appointment) {
+const modal = document.getElementById('appointmentModal');
+const modalContent = document.getElementById('modalContent');
+const sheet = modal.querySelector('.bottom-sheet');
+modalContent.innerHTML = `
+<h3 class="text-lg font-semibold mb-4">${appointment.title}</h3>
+<div class="space-y-3">
+<div class="flex justify-between">
+<span class="text-gray-600">Work Order:</span>
+<span class="font-medium">${appointment.workOrderId}</span>
+</div>
+<div class="flex justify-between">
+<span class="text-gray-600">Date & Time:</span>
+<span class="font-medium">${formatDateTime(appointment.date, appointment.time)}</span>
+</div>
+<div class="flex justify-between">
+<span class="text-gray-600">Duration:</span>
+<span class="font-medium">${appointment.duration} minutes</span>
+</div>
+<div class="flex justify-between">
+<span class="text-gray-600">Location:</span>
+<span class="font-medium">${appointment.location}</span>
+</div>
+<div class="flex justify-between">
+<span class="text-gray-600">Technician:</span>
+<span class="font-medium">${appointment.technician}</span>
+</div>
+<div class="flex justify-between">
+<span class="text-gray-600">Customer:</span>
+<span class="font-medium">${appointment.customer}</span>
+</div>
+<div class="flex justify-between">
+<span class="text-gray-600">Priority:</span>
+<span class="px-2 py-1 rounded-full text-xs font-medium" style="background-color: ${getPriorityColor(appointment.priority)}20; color: ${getPriorityColor(appointment.priority)}">${appointment.priority}</span>
+</div>
+</div>
+<div class="flex space-x-3 mt-6">
+<button class="flex-1 bg-primary text-white py-3 px-4 rounded-lg font-medium cursor-pointer !rounded-button">
+Edit Appointment
+</button>
+<button class="flex-1 bg-white text-gray-700 border border-gray-200 py-3 px-4 rounded-lg font-medium cursor-pointer !rounded-button">
+Cancel
+</button>
+</div>
+`;
+modal.classList.remove('hidden');
+setTimeout(() => {
+sheet.classList.add('open');
+}, 10);
+}
+function showDayAppointments(date) {
+const dayAppointments = getAppointmentsForDate(date);
+const modal = document.getElementById('appointmentModal');
+const modalContent = document.getElementById('modalContent');
+const sheet = modal.querySelector('.bottom-sheet');
+modalContent.innerHTML = `
+<h3 class="text-lg font-semibold mb-4">${date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</h3>
+<div class="space-y-3">
+${dayAppointments.length === 0 ?
+'<p class="text-gray-500 text-center py-4">No appointments scheduled</p>' :
+dayAppointments.map(apt => `
+<div class="bg-gray-50 rounded-lg p-3 cursor-pointer" onclick="showAppointmentDetails(appointments.find(a => a.id === '${apt.id}'))">
+<div class="font-semibold text-gray-900">${apt.title}</div>
+<div class="text-sm text-gray-600">${apt.time} - ${apt.location}</div>
+<div class="text-xs text-gray-500 mt-1">${apt.technician}</div>
+</div>
+`).join('')
+}
+</div>
+<div class="mt-6">
+<button class="w-full bg-primary text-white py-3 px-4 rounded-lg font-medium cursor-pointer !rounded-button">
+<i class="ri-add-line mr-2"></i>Add Appointment
+</button>
+</div>
+`;
+modal.classList.remove('hidden');
+setTimeout(() => {
+sheet.classList.add('open');
+}, 10);
+}
+function hideModal() {
+const modal = document.getElementById('appointmentModal');
+const sheet = modal.querySelector('.bottom-sheet');
+sheet.classList.remove('open');
+setTimeout(() => {
+modal.classList.add('hidden');
+}, 300);
+}
+document.addEventListener('DOMContentLoaded', function() {
+const overlay = document.getElementById('modalOverlay');
+const fabButton = document.getElementById('fabButton');
+const addAppointmentBtn = document.getElementById('addAppointmentBtn');
+overlay.addEventListener('click', hideModal);
+[fabButton, addAppointmentBtn].forEach(btn => {
+btn.addEventListener('click', () => {
+const modal = document.getElementById('appointmentModal');
+const modalContent = document.getElementById('modalContent');
+const sheet = modal.querySelector('.bottom-sheet');
+modalContent.innerHTML = `
+<h3 class="text-lg font-semibold mb-4">New Appointment</h3>
+<form class="space-y-4">
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+<input type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Enter appointment title">
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+<input type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-1">Time</label>
+<input type="time" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+<input type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Enter location">
+</div>
+<div class="flex space-x-3 mt-6">
+<button type="submit" class="flex-1 bg-primary text-white py-3 px-4 rounded-lg font-medium cursor-pointer !rounded-button">
+Create Appointment
+</button>
+<button type="button" onclick="hideModal()" class="flex-1 bg-white text-gray-700 border border-gray-200 py-3 px-4 rounded-lg font-medium cursor-pointer !rounded-button">
+Cancel
+</button>
+</div>
+</form>
+`;
+modal.classList.remove('hidden');
+setTimeout(() => {
+sheet.classList.add('open');
+}, 10);
+});
+});
+});
+</script>
+<script id="filterHandler">
+document.addEventListener('DOMContentLoaded', function() {
+const filterButtons = document.querySelectorAll('button[class*="rounded-full"]');
+filterButtons.forEach(button => {
+button.addEventListener('click', function() {
+if (this.textContent.trim() === 'All' ||
+this.textContent.trim() === 'High Priority' ||
+this.textContent.trim() === 'Maintenance' ||
+this.textContent.trim() === 'Inspection' ||
+this.textContent.trim() === 'Emergency') {
+filterButtons.forEach(btn => {
+if (btn.textContent.trim() === 'All' ||
+btn.textContent.trim() === 'High Priority' ||
+btn.textContent.trim() === 'Maintenance' ||
+btn.textContent.trim() === 'Inspection' ||
+btn.textContent.trim() === 'Emergency') {
+btn.classList.remove('bg-primary', 'text-white');
+btn.classList.add('bg-white', 'text-gray-600', 'border', 'border-gray-200');
+}
+});
+this.classList.remove('bg-white', 'text-gray-600', 'border', 'border-gray-200');
+this.classList.add('bg-primary', 'text-white');
+renderCalendar();
+renderUpcomingAppointments();
+}
+});
+});
+});
+</script>
+
+<script>
+    (function() {
+      const imgs = Array.from(document.querySelectorAll('img'));
+      Promise.all(imgs.map((img) => new Promise((resolve) => {
+        img.onload = () => {
+          resolve(null);
+        };
+      }))).finally(() => {
+        window.parent.postMessage({
+          type: 'iframeHeight',
+          height: document.body.offsetHeight
+        }, '*');
+      })
+    })()
+  </script><script>
+      (function () {
+  'use strict';
+
+  const originalWindowOpen = window.originalWindowOpen ?? window.open;
+
+  function processAnchor(url) {
+    // 查找锚点，平滑滚动
+    const anchor = document.querySelector(url);
+    if (anchor) {
+      anchor.scrollIntoView({ behavior: 'smooth' });
+    }
+    // 发送 hashchange 事件
+    const event = new Event('hashchange');
+    event.newURL = url;
+    event.oldURL = window.location.href;
+    // 因为预览 iframe 没有 url，所以需要手动设置
+    window.location.hash = url;
+    window.dispatchEvent(event);
+  }
+
+  // 重写 window.open
+  window.open = function (url, target, features) {
+    if (url.startsWith('#')) {
+      // 查找锚点，平滑滚动
+      processAnchor(url);
+      return;
+    }
+    originalWindowOpen(url, '_blank', features);
+    return null;
+  };
+})();
+
+      
+  window.addEventListener('click', (event) => {
+    const target = event.target;
+    const closest = target.closest('a');
+    if (!closest) return;
+    if (closest.tagName === 'A') {
+      event.preventDefault();
+      const href = closest.getAttribute('href');
+      if (!href) return;
+      // check is void link
+      if (['#', 'javascript:void(0)', ''].includes(href)) {
+        return;
+      }
+      // 锚点链接也不处理
+      if (href.startsWith('#')) {
+        return;
+      }
+      window.open(closest.href, '_blank');
+    }
+  });
+
+      
+  document.addEventListener('submit', (event) => {
+    event.preventDefault();
+  }, true);
+
+    </script></body></html>

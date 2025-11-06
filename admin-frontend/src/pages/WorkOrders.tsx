@@ -3,6 +3,13 @@ import { toast } from 'react-hot-toast';
 import { apiService } from '../services/api';
 import { Job, JobsResponse, JobStatus, JobPriority } from '../types';
 import WorkOrderModal from '../components/WorkOrderModal';
+import EquipmentIntakeForm from '../components/EquipmentIntakeForm';
+import EquipmentStatusTimeline from '../components/EquipmentStatusTimeline';
+import UpdateStatusModal from '../components/UpdateStatusModal';
+import ReturnLogistics from '../components/ReturnLogistics';
+import { intakeService } from '../services/intakeService';
+import { statusService } from '../services/statusService';
+import type { EquipmentIntake, EquipmentStatus, EquipmentStatusHistory } from '../types/workshop';
 
 interface WorkOrdersPageState {
   jobs: Job[];
@@ -12,14 +19,22 @@ interface WorkOrdersPageState {
   priorityFilter: string;
   technicianFilter: string;
   customerFilter: string;
+  locationTypeFilter: string;
   currentPage: number;
   totalPages: number;
   showModal: boolean;
   showDeleteModal: boolean;
   showDetailsModal: boolean;
+  showIntakeModal: boolean;
+  showStatusModal: boolean;
   editingJob: Job | null;
   deletingJob: Job | null;
   viewingJob: Job | null;
+  intakeJob: Job | null;
+  existingIntake: EquipmentIntake | null;
+  equipmentStatus: EquipmentStatus | null;
+  statusHistory: EquipmentStatusHistory[];
+  loadingStatus: boolean;
   activeDropdown: string | null;
 }
 
@@ -32,21 +47,29 @@ const WorkOrders: React.FC = () => {
     priorityFilter: '',
     technicianFilter: '',
     customerFilter: '',
+    locationTypeFilter: '',
     currentPage: 1,
     totalPages: 1,
     showModal: false,
     showDeleteModal: false,
     showDetailsModal: false,
+    showIntakeModal: false,
+    showStatusModal: false,
     editingJob: null,
     deletingJob: null,
     viewingJob: null,
+    intakeJob: null,
+    existingIntake: null,
+    equipmentStatus: null,
+    statusHistory: [],
+    loadingStatus: false,
     activeDropdown: null,
   });
 
   // Load jobs on component mount and when filters change
   useEffect(() => {
     loadJobs();
-  }, [state.currentPage, state.searchTerm, state.statusFilter, state.priorityFilter, state.technicianFilter, state.customerFilter]);
+  }, [state.currentPage, state.searchTerm, state.statusFilter, state.priorityFilter, state.technicianFilter, state.customerFilter, state.locationTypeFilter]);
 
   const loadJobs = async () => {
     try {
@@ -62,6 +85,7 @@ const WorkOrders: React.FC = () => {
       if (state.priorityFilter) params.priority = state.priorityFilter;
       if (state.technicianFilter) params.technician_id = state.technicianFilter;
       if (state.customerFilter) params.customer_id = state.customerFilter;
+      if (state.locationTypeFilter) params.location_type = state.locationTypeFilter;
 
       const response = await apiService.getJobs(params);
 
@@ -129,20 +153,115 @@ const WorkOrders: React.FC = () => {
     }));
   };
 
-  const openDetailsModal = (job: Job) => {
+  const openDetailsModal = async (job: Job) => {
     setState(prev => ({ 
       ...prev, 
       viewingJob: job, 
-      showDetailsModal: true 
+      showDetailsModal: true,
+      equipmentStatus: null,
+      statusHistory: [],
     }));
+
+    // Load equipment status if this is a workshop job
+    if ((job as any).location_type === 'workshop') {
+      await loadEquipmentStatus(job.id);
+    }
   };
 
   const closeDetailsModal = () => {
     setState(prev => ({ 
       ...prev, 
       showDetailsModal: false, 
-      viewingJob: null 
+      viewingJob: null,
+      equipmentStatus: null,
+      statusHistory: [],
     }));
+  };
+
+  const loadEquipmentStatus = async (jobId: string) => {
+    try {
+      setState(prev => ({ ...prev, loadingStatus: true }));
+
+      // Load current status
+      const statusResponse = await statusService.getEquipmentStatus(jobId);
+      
+      // Load status history
+      const historyResponse = await statusService.getStatusHistory(jobId);
+
+      if (statusResponse.success && statusResponse.data) {
+        setState(prev => ({
+          ...prev,
+          equipmentStatus: statusResponse.data || null,
+          statusHistory: historyResponse.data || [],
+          loadingStatus: false,
+        }));
+      } else {
+        setState(prev => ({ ...prev, loadingStatus: false }));
+      }
+    } catch (error) {
+      console.error('Error loading equipment status:', error);
+      setState(prev => ({ ...prev, loadingStatus: false }));
+    }
+  };
+
+  const openStatusModal = () => {
+    setState(prev => ({ ...prev, showStatusModal: true }));
+  };
+
+  const closeStatusModal = () => {
+    setState(prev => ({ ...prev, showStatusModal: false }));
+  };
+
+  const handleStatusUpdateSuccess = () => {
+    if (state.viewingJob) {
+      loadEquipmentStatus(state.viewingJob.id);
+      loadJobs(); // Refresh job list
+    }
+  };
+
+  const openIntakeModal = async (job: Job) => {
+    // Check if intake already exists
+    try {
+      const response = await intakeService.getIntakeByJobId(job.id);
+      if (response.success && response.data) {
+        setState(prev => ({
+          ...prev,
+          intakeJob: job,
+          existingIntake: response.data || null,
+          showIntakeModal: true,
+        }));
+      } else {
+        // No existing intake
+        setState(prev => ({
+          ...prev,
+          intakeJob: job,
+          existingIntake: null,
+          showIntakeModal: true,
+        }));
+      }
+    } catch (error) {
+      // No existing intake, open form for new intake
+      setState(prev => ({
+        ...prev,
+        intakeJob: job,
+        existingIntake: null,
+        showIntakeModal: true,
+      }));
+    }
+  };
+
+  const closeIntakeModal = () => {
+    setState(prev => ({
+      ...prev,
+      showIntakeModal: false,
+      intakeJob: null,
+      existingIntake: null,
+    }));
+  };
+
+  const handleIntakeSuccess = (intake: EquipmentIntake) => {
+    closeIntakeModal();
+    loadJobs();
   };
 
   const handleDelete = async () => {
@@ -208,6 +327,46 @@ const WorkOrders: React.FC = () => {
     };
 
     const config = priorityConfig[priority] || priorityConfig.medium;
+    
+    return (
+      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${config.bg} ${config.text}`}>
+        {config.label}
+      </span>
+    );
+  };
+
+  const getLocationTypeBadge = (locationType?: string) => {
+    if (!locationType || locationType === 'on_site') {
+      return (
+        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+          <i className="ri-map-pin-line mr-1"></i>
+          On-Site
+        </span>
+      );
+    }
+    return (
+      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+        <i className="ri-tools-line mr-1"></i>
+        Workshop
+      </span>
+    );
+  };
+
+  const getEquipmentStatusBadge = (status?: string) => {
+    if (!status) return null;
+
+    const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
+      pending_intake: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Pending Intake' },
+      in_transit: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'In Transit' },
+      received: { bg: 'bg-indigo-100', text: 'text-indigo-800', label: 'Received' },
+      in_repair: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'In Repair' },
+      repair_completed: { bg: 'bg-green-100', text: 'text-green-800', label: 'Repair Completed' },
+      ready_for_pickup: { bg: 'bg-teal-100', text: 'text-teal-800', label: 'Ready for Pickup' },
+      out_for_delivery: { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Out for Delivery' },
+      returned: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Returned' },
+    };
+
+    const config = statusConfig[status] || statusConfig.pending_intake;
     
     return (
       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${config.bg} ${config.text}`}>
@@ -411,6 +570,43 @@ const WorkOrders: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* Location Type Filter */}
+              <div className="relative">
+                <button
+                  onClick={() => toggleDropdown('locationType')}
+                  className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <span>Location</span>
+                  <i className="ri-arrow-down-s-line"></i>
+                </button>
+                {state.activeDropdown === 'locationType' && (
+                  <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+                    <div className="py-2">
+                      <button
+                        onClick={() => handleFilterChange('locationTypeFilter', '')}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        All Locations
+                      </button>
+                      <button
+                        onClick={() => handleFilterChange('locationTypeFilter', 'on_site')}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <i className="ri-map-pin-line mr-2"></i>
+                        On-Site
+                      </button>
+                      <button
+                        onClick={() => handleFilterChange('locationTypeFilter', 'workshop')}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <i className="ri-tools-line mr-2"></i>
+                        Workshop
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center space-x-2">
@@ -442,6 +638,9 @@ const WorkOrders: React.FC = () => {
                       Work Order
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Location
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Customer
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -467,7 +666,7 @@ const WorkOrders: React.FC = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {state.jobs.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                      <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                         <i className="ri-file-list-line text-4xl mb-4 block"></i>
                         No work orders found
                       </td>
@@ -483,6 +682,16 @@ const WorkOrders: React.FC = () => {
                             <div className="text-sm text-gray-500 truncate max-w-xs">
                               {job.title}
                             </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="space-y-1">
+                            {getLocationTypeBadge((job as any).location_type)}
+                            {(job as any).location_type === 'workshop' && (job as any).equipment_status && (
+                              <div>
+                                {getEquipmentStatusBadge((job as any).equipment_status.current_status)}
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -673,6 +882,17 @@ const WorkOrders: React.FC = () => {
               <div className="flex items-center space-x-4">
                 {getStatusBadge(state.viewingJob.status)}
                 {getPriorityBadge(state.viewingJob.priority)}
+                {(state.viewingJob as any).location_type === 'workshop' && (
+                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                    Workshop
+                  </span>
+                )}
+                {(state.viewingJob as any).equipment_intake && (
+                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                    <i className="ri-checkbox-circle-line mr-1"></i>
+                    Intake Recorded
+                  </span>
+                )}
               </div>
 
               {/* Basic Information */}
@@ -758,9 +978,81 @@ const WorkOrders: React.FC = () => {
                 </div>
               </div>
 
+              {/* Equipment Status Timeline for Workshop Jobs */}
+              {(state.viewingJob as any).location_type === 'workshop' && (
+                <div className="border-t border-gray-200 pt-6">
+                  {state.loadingStatus ? (
+                    <div className="text-center py-8">
+                      <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      <p className="mt-2 text-gray-600">Loading equipment status...</p>
+                    </div>
+                  ) : state.equipmentStatus ? (
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-medium text-gray-900">Equipment Status</h3>
+                        <button
+                          onClick={openStatusModal}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center text-sm"
+                        >
+                          <i className="ri-refresh-line mr-2"></i>
+                          Update Status
+                        </button>
+                      </div>
+                      
+                      {/* Display estimated completion date if available */}
+                      {(state.viewingJob as any).estimated_completion_date && (
+                        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex items-center">
+                            <i className="ri-calendar-line text-blue-600 text-xl mr-3"></i>
+                            <div>
+                              <p className="text-sm font-medium text-blue-900">Estimated Completion</p>
+                              <p className="text-sm text-blue-700">
+                                {new Date((state.viewingJob as any).estimated_completion_date).toLocaleDateString('en-US', {
+                                  weekday: 'short',
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <EquipmentStatusTimeline
+                        equipmentStatus={state.equipmentStatus}
+                        statusHistory={state.statusHistory}
+                      />
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                      <i className="ri-information-line text-gray-400 text-4xl mb-2"></i>
+                      <p className="text-gray-600">No equipment status available</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Return Logistics for Workshop Jobs */}
+              {(state.viewingJob as any).location_type === 'workshop' && state.equipmentStatus && (
+                <div className="border-t border-gray-200 pt-6">
+                  <ReturnLogistics
+                    job={state.viewingJob}
+                    currentStatus={state.equipmentStatus.current_status}
+                    onSuccess={async () => {
+                      // Reload job details and status
+                      await loadJobs();
+                      if (state.viewingJob) {
+                        await loadEquipmentStatus(state.viewingJob.id);
+                      }
+                    }}
+                  />
+                </div>
+              )}
+
               {/* Notes and Feedback */}
               {(state.viewingJob.technician_notes || state.viewingJob.customer_feedback) && (
-                <div>
+                <div className="border-t border-gray-200 pt-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Notes & Feedback</h3>
                   <div className="space-y-4">
                     {state.viewingJob.technician_notes && (
@@ -800,26 +1092,89 @@ const WorkOrders: React.FC = () => {
               )}
 
               {/* Actions */}
-              <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
-                <button
-                  onClick={closeDetailsModal}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
-                >
-                  Close
-                </button>
-                <button
-                  onClick={() => {
-                    closeDetailsModal();
-                    openModal(state.viewingJob!);
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                >
-                  Edit Work Order
-                </button>
+              <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+                <div>
+                  {/* Show Record Intake button for workshop jobs */}
+                  {(state.viewingJob as any).location_type === 'workshop' && (
+                    <button
+                      onClick={() => {
+                        closeDetailsModal();
+                        openIntakeModal(state.viewingJob!);
+                      }}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center"
+                    >
+                      <i className="ri-file-list-3-line mr-2"></i>
+                      {(state.viewingJob as any).equipment_intake ? 'View/Edit Intake' : 'Record Intake'}
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center space-x-4">
+                  <button
+                    onClick={closeDetailsModal}
+                    className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => {
+                      closeDetailsModal();
+                      openModal(state.viewingJob!);
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    Edit Work Order
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Equipment Intake Modal */}
+      {state.showIntakeModal && state.intakeJob && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Equipment Intake - {state.intakeJob.job_number}
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {state.existingIntake ? 'View or edit equipment intake record' : 'Record equipment condition and details'}
+                  </p>
+                </div>
+                <button
+                  onClick={closeIntakeModal}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                >
+                  <i className="ri-close-line text-xl"></i>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <EquipmentIntakeForm
+                jobId={state.intakeJob.id}
+                existingIntake={state.existingIntake || undefined}
+                onSuccess={handleIntakeSuccess}
+                onCancel={closeIntakeModal}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Update Status Modal */}
+      {state.showStatusModal && state.viewingJob && state.equipmentStatus && (
+        <UpdateStatusModal
+          isOpen={state.showStatusModal}
+          currentStatus={state.equipmentStatus.current_status}
+          jobId={state.viewingJob.id}
+          onClose={closeStatusModal}
+          onSuccess={handleStatusUpdateSuccess}
+        />
       )}
 
       {/* Click outside to close dropdowns */}

@@ -70,11 +70,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await apiService.login(credentials);
 
       if (response.success && response.data) {
-        // Validate that the user is a technician
-        if (response.data.user.role !== 'technician') {
+        // Allow technicians and customers to use the mobile app
+        if (response.data.user.role !== 'technician' && response.data.user.role !== 'customer') {
           return {
             success: false,
-            error: 'This app is for technicians only. Please use the web dashboard for admin access.',
+            error: 'This app is for technicians and customers only. Please use the web dashboard for admin access.',
           };
         }
 

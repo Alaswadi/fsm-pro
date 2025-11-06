@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { query } from '../config/database';
 import { ApiResponse, Job, JobStatus, JobPriority, AuthRequest } from '../types';
+import { checkWorkshopCapacity } from '../services/capacityService';
+import { updateJobTotal } from '../services/invoiceService';
 
 // Get all jobs/work orders with pagination and filtering
 export const getJobs = async (req: AuthRequest, res: Response) => {
@@ -15,7 +17,8 @@ export const getJobs = async (req: AuthRequest, res: Response) => {
       customer_id,
       equipment_id,
       date_from,
-      date_to
+      date_to,
+      location_type
     } = req.query;
 
     const offset = (Number(page) - 1) * Number(limit);
@@ -82,6 +85,12 @@ export const getJobs = async (req: AuthRequest, res: Response) => {
       paramIndex++;
     }
 
+    if (location_type) {
+      whereConditions.push(`j.location_type = $${paramIndex}`);
+      queryParams.push(location_type);
+      paramIndex++;
+    }
+
     const whereClause = whereConditions.join(' AND ');
 
     // Get total count
@@ -111,13 +120,16 @@ export const getJobs = async (req: AuthRequest, res: Response) => {
         ce.serial_number as equipment_serial,
         et.name as equipment_name,
         et.brand as equipment_brand,
-        et.model as equipment_model
+        et.model as equipment_model,
+        es.current_status as equipment_status,
+        es.id as equipment_status_id
       FROM jobs j
       LEFT JOIN customers c ON j.customer_id = c.id
       LEFT JOIN technicians t ON j.technician_id = t.id
       LEFT JOIN users tu ON t.user_id = tu.id
       LEFT JOIN customer_equipment ce ON j.equipment_id = ce.id
       LEFT JOIN equipment_types et ON ce.equipment_type_id = et.id
+      LEFT JOIN equipment_status es ON j.id = es.job_id
       WHERE ${whereClause}
       ORDER BY j.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -152,6 +164,11 @@ export const getJobs = async (req: AuthRequest, res: Response) => {
       created_by: row.created_by,
       created_at: row.created_at,
       updated_at: row.updated_at,
+      location_type: row.location_type,
+      estimated_completion_date: row.estimated_completion_date,
+      pickup_delivery_fee: row.pickup_delivery_fee,
+      delivery_scheduled_date: row.delivery_scheduled_date,
+      delivery_technician_id: row.delivery_technician_id,
       customer: row.customer_name ? {
         id: row.customer_id,
         name: row.customer_name,
@@ -176,6 +193,10 @@ export const getJobs = async (req: AuthRequest, res: Response) => {
           brand: row.equipment_brand,
           model: row.equipment_model
         }
+      } : null,
+      equipment_status: row.equipment_status_id ? {
+        id: row.equipment_status_id,
+        current_status: row.equipment_status
       } : null
     }));
 
@@ -341,7 +362,12 @@ export const createJob = async (req: AuthRequest, res: Response) => {
       status = 'assigned',
       scheduled_date,
       due_date,
-      estimated_duration
+      estimated_duration,
+      location_type = 'on_site',
+      estimated_completion_date,
+      pickup_delivery_fee,
+      delivery_scheduled_date,
+      delivery_technician_id
     } = req.body;
 
     const companyId = req.company?.id;
@@ -356,38 +382,52 @@ export const createJob = async (req: AuthRequest, res: Response) => {
     }
 
     // Validation
-    if (!customer_id || !technician_id || !title || !description) {
+    // For workshop jobs, technician is optional (can be assigned later from queue)
+    const isWorkshopJob = location_type === 'workshop';
+    
+    if (!customer_id || !title || !description) {
       console.log('ERROR: Missing required fields:', {
         customer_id: !!customer_id,
-        technician_id: !!technician_id,
         title: !!title,
         description: !!description
       });
       return res.status(400).json({
         success: false,
-        error: 'Customer, technician, title, and description are required'
+        error: 'Customer, title, and description are required'
       } as ApiResponse);
     }
 
-    // Validate due_date is required and not in the past
-    if (!due_date) {
-      console.log('ERROR: Due date is required');
+    // For on-site jobs, technician is required
+    if (!isWorkshopJob && !technician_id) {
+      console.log('ERROR: Technician required for on-site jobs');
       return res.status(400).json({
         success: false,
-        error: 'Due date is required'
+        error: 'Technician is required for on-site jobs'
       } as ApiResponse);
     }
 
-    const dueDateObj = new Date(due_date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset time to start of day for comparison
+    // Validate due_date is required and not in the past (for on-site jobs)
+    // For workshop jobs, estimated_completion_date is used instead
+    if (!isWorkshopJob) {
+      if (!due_date) {
+        console.log('ERROR: Due date is required for on-site jobs');
+        return res.status(400).json({
+          success: false,
+          error: 'Due date is required for on-site jobs'
+        } as ApiResponse);
+      }
 
-    if (dueDateObj < today) {
-      console.log('ERROR: Due date cannot be in the past');
-      return res.status(400).json({
-        success: false,
-        error: 'Due date cannot be in the past'
-      } as ApiResponse);
+      const dueDateObj = new Date(due_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Reset time to start of day for comparison
+
+      if (dueDateObj < today) {
+        console.log('ERROR: Due date cannot be in the past');
+        return res.status(400).json({
+          success: false,
+          error: 'Due date cannot be in the past'
+        } as ApiResponse);
+      }
     }
 
     // Verify customer exists and belongs to company
@@ -424,20 +464,57 @@ export const createJob = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Verify technician exists and belongs to company (required)
-    console.log('Checking technician:', technician_id, 'for company:', companyId);
-    const technicianCheck = await query(
-      'SELECT id FROM technicians WHERE id = $1 AND company_id = $2',
-      [technician_id, companyId]
-    );
-    console.log('Technician check result:', technicianCheck.rows.length);
+    // Verify technician exists and belongs to company (if provided)
+    if (technician_id) {
+      console.log('Checking technician:', technician_id, 'for company:', companyId);
+      const technicianCheck = await query(
+        'SELECT id FROM technicians WHERE id = $1 AND company_id = $2',
+        [technician_id, companyId]
+      );
+      console.log('Technician check result:', technicianCheck.rows.length);
 
-    if (technicianCheck.rows.length === 0) {
-      console.log('ERROR: Invalid technician ID');
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid technician ID'
-      } as ApiResponse);
+      if (technicianCheck.rows.length === 0) {
+        console.log('ERROR: Invalid technician ID');
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid technician ID'
+        } as ApiResponse);
+      }
+    }
+
+    // Verify delivery technician exists (if provided)
+    if (delivery_technician_id) {
+      const deliveryTechCheck = await query(
+        'SELECT id FROM technicians WHERE id = $1 AND company_id = $2',
+        [delivery_technician_id, companyId]
+      );
+
+      if (deliveryTechCheck.rows.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid delivery technician ID'
+        } as ApiResponse);
+      }
+    }
+
+    // Check workshop capacity for workshop jobs
+    if (isWorkshopJob) {
+      const capacityCheck = await checkWorkshopCapacity(companyId);
+      
+      if (!capacityCheck.isValid) {
+        console.log('WARNING: Workshop capacity limit reached');
+        // Return warning but allow creation (soft limit)
+        // Frontend can display this warning to the user
+        return res.status(400).json({
+          success: false,
+          error: capacityCheck.error,
+          code: 'CAPACITY_WARNING',
+          data: {
+            current_count: capacityCheck.currentCount,
+            max_capacity: capacityCheck.maxCapacity
+          }
+        } as ApiResponse);
+      }
     }
 
     // Generate job number
@@ -453,8 +530,10 @@ export const createJob = async (req: AuthRequest, res: Response) => {
     const insertQuery = `
       INSERT INTO jobs (
         company_id, customer_id, equipment_id, technician_id, job_number,
-        title, description, priority, status, scheduled_date, due_date, estimated_duration, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        title, description, priority, status, scheduled_date, due_date, estimated_duration, 
+        location_type, estimated_completion_date, pickup_delivery_fee, 
+        delivery_scheduled_date, delivery_technician_id, created_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
       RETURNING *
     `;
 
@@ -462,20 +541,34 @@ export const createJob = async (req: AuthRequest, res: Response) => {
       companyId,
       customer_id,
       equipment_id || null,
-      technician_id,
+      technician_id || null,
       job_number,
       title,
       description,
       priority,
       status,
       scheduled_date || null,
-      due_date,
+      due_date || null,
       estimated_duration || null,
+      location_type,
+      estimated_completion_date || null,
+      pickup_delivery_fee || null,
+      delivery_scheduled_date || null,
+      delivery_technician_id || null,
       userId
     ];
 
     const result = await query(insertQuery, values);
     const newJob = result.rows[0];
+
+    // Initialize equipment_status record for workshop jobs
+    if (isWorkshopJob) {
+      await query(`
+        INSERT INTO equipment_status (
+          job_id, company_id, current_status, pending_intake_at
+        ) VALUES ($1, $2, $3, NOW())
+      `, [newJob.id, companyId, 'pending_intake']);
+    }
 
     // Fetch the complete job data with related information
     const completeJobResult = await query(`
@@ -948,6 +1041,17 @@ export const updateJobStatus = async (req: AuthRequest, res: Response) => {
 
     const result = await query(updateQuery, [status, started_at, completed_at, id, companyId]);
     const updatedJob = result.rows[0];
+
+    // If job is being marked as completed, calculate and update total cost
+    // This makes the job ready for invoicing
+    if (status === 'completed' && updatedJob.location_type === 'on_site') {
+      try {
+        await updateJobTotal(id);
+      } catch (totalError) {
+        console.error('Failed to calculate job total:', totalError);
+        // Don't fail the request if total calculation fails
+      }
+    }
 
     res.json({
       success: true,

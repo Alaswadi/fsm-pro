@@ -78,9 +78,16 @@ class PushNotificationService {
   private async getExpoPushToken(): Promise<string | null> {
     try {
       const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-      
+
       if (!projectId) {
-        console.warn('No project ID found for push notifications');
+        console.log('Push notifications: No project ID configured. Remote push notifications will not work in Expo Go.');
+        return null;
+      }
+
+      // Validate that projectId is a valid UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(projectId)) {
+        console.log('Push notifications: Invalid project ID format. Please run "eas init" to set up your project, or use a development build for push notifications.');
         return null;
       }
 
@@ -90,7 +97,8 @@ class PushNotificationService {
 
       return token.data;
     } catch (error) {
-      console.error('Error getting Expo push token:', error);
+      // Silently handle errors in Expo Go since remote notifications aren't supported
+      console.log('Push notifications: Unable to get push token. This is expected in Expo Go. Use a development build for full push notification support.');
       return null;
     }
   }

@@ -16,6 +16,11 @@ import { Job, InventoryItem } from '../src/types';
 import { apiService } from '../src/services/api';
 import { ImagePickerButton } from '../src/components/ImagePickerButton';
 import { Toast } from '../src/components/Toast';
+import { Theme } from '@/constants/Theme';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { ThemedText } from '@/components/ThemedText';
 
 export default function WorkOrderDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -42,12 +47,26 @@ export default function WorkOrderDetailsScreen() {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
+  
+  // Workshop status state
+  const [showWorkshopStatusModal, setShowWorkshopStatusModal] = useState(false);
+  const [equipmentStatus, setEquipmentStatus] = useState<any>(null);
+  const [equipmentStatusHistory, setEquipmentStatusHistory] = useState<any[]>([]);
+  const [selectedEquipmentStatus, setSelectedEquipmentStatus] = useState<string>('');
+  const [statusNotes, setStatusNotes] = useState('');
+  const [isUpdatingEquipmentStatus, setIsUpdatingEquipmentStatus] = useState(false);
 
   useEffect(() => {
     if (id) {
       loadJobDetails();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (job?.location_type === 'workshop') {
+      loadEquipmentStatus();
+    }
+  }, [job]);
 
   const loadJobDetails = async () => {
     if (!id) return;
@@ -95,6 +114,49 @@ export default function WorkOrderDetailsScreen() {
       setOrderedEquipmentSummary(null);
     } finally {
       setIsLoadingOrderedEquipment(false);
+    }
+  };
+
+  const loadEquipmentStatus = async () => {
+    if (!id) return;
+    
+    try {
+      const statusResponse = await apiService.getEquipmentStatus(id);
+      if (statusResponse.success && statusResponse.data) {
+        setEquipmentStatus(statusResponse.data);
+        setSelectedEquipmentStatus(statusResponse.data.current_status);
+      }
+
+      const historyResponse = await apiService.getEquipmentStatusHistory(id);
+      if (historyResponse.success && historyResponse.data) {
+        setEquipmentStatusHistory(historyResponse.data);
+      }
+    } catch (error) {
+      console.error('Failed to load equipment status:', error);
+    }
+  };
+
+  const handleEquipmentStatusUpdate = async () => {
+    if (!id || !selectedEquipmentStatus) return;
+    
+    setIsUpdatingEquipmentStatus(true);
+    try {
+      const response = await apiService.updateEquipmentStatus(id, selectedEquipmentStatus, statusNotes);
+      
+      if (response.success && response.data) {
+        setEquipmentStatus(response.data);
+        setShowWorkshopStatusModal(false);
+        setStatusNotes('');
+        showToast('Equipment status updated successfully', 'success');
+        await loadEquipmentStatus();
+        await loadJobDetails();
+      } else {
+        Alert.alert('Error', response.error || 'Failed to update equipment status');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update equipment status');
+    } finally {
+      setIsUpdatingEquipmentStatus(false);
     }
   };
 
@@ -147,7 +209,7 @@ export default function WorkOrderDetailsScreen() {
       
       if (response.success && response.data) {
         // Extract inventory_items array from the response data (same as inventory tab)
-        const inventoryItems = response.data.inventory_items || [];
+        const inventoryItems = Array.isArray(response.data) ? response.data : (response.data as any).inventory_items || [];
         setInventory(inventoryItems);
       } else {
         setInventory([]); // Reset to empty array on error
@@ -205,7 +267,7 @@ export default function WorkOrderDetailsScreen() {
     // Validate inventory availability
     const insufficientStockItems = itemsToOrder.filter(orderItem => {
       const inventoryItem = orderItem.item;
-      return inventoryItem && inventoryItem.stock_level < orderItem.quantity;
+      return inventoryItem && (inventoryItem.current_stock || 0) < orderItem.quantity;
     });
 
     if (insufficientStockItems.length > 0) {
@@ -238,7 +300,7 @@ export default function WorkOrderDetailsScreen() {
           if (orderedItem) {
             return {
               ...item,
-              stock_level: item.stock_level - orderedItem.quantity
+              current_stock: item.current_stock - orderedItem.quantity
             };
           }
           return item;
@@ -310,6 +372,34 @@ export default function WorkOrderDetailsScreen() {
       case 'cancelled': return '#EF4444';
       default: return '#6B7280';
     }
+  };
+
+  const getEquipmentStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending_intake': return '#9CA3AF';
+      case 'in_transit': return '#3B82F6';
+      case 'received': return '#3B82F6';
+      case 'in_repair': return '#F59E0B';
+      case 'repair_completed': return '#10B981';
+      case 'ready_for_pickup': return '#10B981';
+      case 'out_for_delivery': return '#8B5CF6';
+      case 'returned': return '#6B7280';
+      default: return '#6B7280';
+    }
+  };
+
+  const getValidStatusTransitions = (currentStatus: string): string[] => {
+    const transitions: Record<string, string[]> = {
+      'pending_intake': ['in_transit', 'received'],
+      'in_transit': ['received'],
+      'received': ['in_repair'],
+      'in_repair': ['repair_completed', 'received'],
+      'repair_completed': ['ready_for_pickup', 'out_for_delivery'],
+      'ready_for_pickup': ['returned'],
+      'out_for_delivery': ['returned'],
+      'returned': []
+    };
+    return transitions[currentStatus] || [];
   };
 
   const getPriorityColor = (priority: Job['priority']) => {
@@ -444,6 +534,106 @@ export default function WorkOrderDetailsScreen() {
     </Modal>
   );
 
+  const renderWorkshopStatusModal = () => {
+    const validTransitions = equipmentStatus 
+      ? getValidStatusTransitions(equipmentStatus.current_status)
+      : [];
+
+    return (
+      <Modal
+        visible={showWorkshopStatusModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowWorkshopStatusModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Update Equipment Status</Text>
+              <TouchableOpacity onPress={() => setShowWorkshopStatusModal(false)}>
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.currentStatusSection}>
+              <Text style={styles.currentStatusLabel}>Current Status:</Text>
+              <View style={[
+                styles.currentStatusBadge,
+                { backgroundColor: getEquipmentStatusColor(equipmentStatus?.current_status || '') }
+              ]}>
+                <Text style={styles.currentStatusText}>
+                  {equipmentStatus?.current_status?.replace(/_/g, ' ').toUpperCase()}
+                </Text>
+              </View>
+            </View>
+            
+            <Text style={styles.selectStatusLabel}>Select New Status:</Text>
+            <View style={styles.statusOptions}>
+              {validTransitions.map((status) => (
+                <TouchableOpacity
+                  key={status}
+                  style={[
+                    styles.statusOption,
+                    selectedEquipmentStatus === status && styles.statusOptionSelected
+                  ]}
+                  onPress={() => setSelectedEquipmentStatus(status)}
+                >
+                  <View style={[
+                    styles.statusDot,
+                    { backgroundColor: getEquipmentStatusColor(status) }
+                  ]} />
+                  <Text style={[
+                    styles.statusOptionText,
+                    selectedEquipmentStatus === status && styles.statusOptionTextSelected
+                  ]}>
+                    {status.replace(/_/g, ' ').toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.notesLabel}>Notes (optional):</Text>
+            <TextInput
+              style={styles.notesInput}
+              value={statusNotes}
+              onChangeText={setStatusNotes}
+              placeholder="Add notes about this status change..."
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setShowWorkshopStatusModal(false);
+                  setStatusNotes('');
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.updateButton,
+                  (isUpdatingEquipmentStatus || !selectedEquipmentStatus) && styles.updateButtonDisabled
+                ]}
+                onPress={handleEquipmentStatusUpdate}
+                disabled={isUpdatingEquipmentStatus || !selectedEquipmentStatus}
+              >
+                {isUpdatingEquipmentStatus ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={styles.updateButtonText}>Update Status</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   const renderInventoryModal = () => (
     <Modal
       visible={showInventoryModal}
@@ -462,8 +652,8 @@ export default function WorkOrderDetailsScreen() {
           
           {isLoadingInventory ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#ea2a33" />
-              <Text style={styles.loadingText}>Loading inventory...</Text>
+              <ActivityIndicator size="large" color={Theme.colors.primary.DEFAULT} />
+              <ThemedText type="body" style={styles.loadingText}>Loading inventory...</ThemedText>
             </View>
           ) : (
             <ScrollView style={styles.inventoryList}>
@@ -556,8 +746,8 @@ export default function WorkOrderDetailsScreen() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#ea2a33" />
-        <Text style={styles.loadingText}>Loading job details...</Text>
+        <ActivityIndicator size="large" color={Theme.colors.primary.DEFAULT} />
+        <ThemedText type="body" style={styles.loadingText}>Loading job details...</ThemedText>
       </View>
     );
   }
@@ -645,6 +835,57 @@ export default function WorkOrderDetailsScreen() {
           </View>
         )}
 
+        {job.location_type === 'workshop' && equipmentStatus && (
+          <View style={styles.workshopStatusSection}>
+            <Text style={styles.sectionTitle}>Equipment Status</Text>
+            
+            <View style={styles.currentEquipmentStatus}>
+              <View style={[
+                styles.equipmentStatusBadge,
+                { backgroundColor: getEquipmentStatusColor(equipmentStatus.current_status) }
+              ]}>
+                <Ionicons name="construct" size={16} color="white" />
+                <Text style={styles.equipmentStatusText}>
+                  {equipmentStatus.current_status.replace(/_/g, ' ').toUpperCase()}
+                </Text>
+              </View>
+            </View>
+
+            {equipmentStatusHistory.length > 0 && (
+              <View style={styles.statusTimeline}>
+                <Text style={styles.timelineTitle}>Status History:</Text>
+                {equipmentStatusHistory.slice(0, 3).map((history, index) => (
+                  <View key={index} style={styles.timelineItem}>
+                    <View style={[
+                      styles.timelineDot,
+                      { backgroundColor: getEquipmentStatusColor(history.to_status) }
+                    ]} />
+                    <View style={styles.timelineContent}>
+                      <Text style={styles.timelineStatus}>
+                        {history.to_status.replace(/_/g, ' ').toUpperCase()}
+                      </Text>
+                      <Text style={styles.timelineDate}>
+                        {new Date(history.changed_at).toLocaleString()}
+                      </Text>
+                      {history.notes && (
+                        <Text style={styles.timelineNotes}>{history.notes}</Text>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.updateStatusButton}
+              onPress={() => setShowWorkshopStatusModal(true)}
+            >
+              <Ionicons name="refresh-outline" size={20} color="white" />
+              <Text style={styles.updateStatusButtonText}>Update Equipment Status</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View style={styles.photoSection}>
           <Text style={styles.sectionTitle}>Job Photos</Text>
           <ImagePickerButton
@@ -684,8 +925,8 @@ export default function WorkOrderDetailsScreen() {
           
           {isLoadingOrderedEquipment ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#ea2a33" />
-              <Text style={styles.loadingText}>Loading ordered equipment...</Text>
+              <ActivityIndicator size="small" color={Theme.colors.primary.DEFAULT} />
+              <ThemedText type="body" style={styles.loadingText}>Loading ordered equipment...</ThemedText>
             </View>
           ) : orderedEquipment.length > 0 ? (
             <>
@@ -720,8 +961,8 @@ export default function WorkOrderDetailsScreen() {
                       <Text style={styles.orderedItemMetaText}>
                         Ordered by {order.ordered_by_name} on {new Date(order.ordered_at).toLocaleDateString()}
                       </Text>
-                      <View style={[styles.statusBadge, { backgroundColor: getOrderStatusColor(order.status) }]}>
-                        <Text style={styles.statusBadgeText}>{order.status}</Text>
+                      <View style={[styles.orderStatusBadge, { backgroundColor: getOrderStatusColor(order.status) }]}>
+                        <Text style={styles.orderStatusBadgeText}>{order.status}</Text>
                       </View>
                     </View>
                     {order.notes && (
@@ -763,6 +1004,7 @@ export default function WorkOrderDetailsScreen() {
 
       {renderStatusModal()}
       {renderNotesModal()}
+      {renderWorkshopStatusModal()}
       {renderInventoryModal()}
       
       {/* Toast Notification */}
@@ -780,47 +1022,42 @@ export default function WorkOrderDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Theme.colors.background.primary,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Theme.colors.background.primary,
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6B7280',
+    marginTop: Theme.spacing.lg,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Theme.colors.background.primary,
   },
   errorText: {
-    fontSize: 16,
-    color: '#EF4444',
+    color: Theme.colors.error.DEFAULT,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    paddingHorizontal: 20,
+    backgroundColor: Theme.colors.white,
+    paddingHorizontal: Theme.spacing.lg,
     paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: Theme.spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: Theme.colors.border.light,
+    ...Theme.shadows.sm,
   },
   backButton: {
-    padding: 8,
-    marginRight: 8,
+    padding: Theme.spacing.sm,
+    marginRight: Theme.spacing.sm,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
     flex: 1,
     textAlign: 'center',
   },
@@ -1292,13 +1529,13 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     flex: 1,
   },
-  statusBadge: {
+  orderStatusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
     marginLeft: 8,
   },
-  statusBadgeText: {
+  orderStatusBadgeText: {
     fontSize: 12,
     color: 'white',
     fontWeight: '600',
@@ -1327,5 +1564,125 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     paddingHorizontal: 20,
+  },
+  // Workshop Status Styles
+  workshopStatusSection: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  currentEquipmentStatus: {
+    marginBottom: 16,
+  },
+  equipmentStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  equipmentStatusText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'white',
+  },
+  statusTimeline: {
+    marginBottom: 16,
+  },
+  timelineTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  timelineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginTop: 4,
+    marginRight: 12,
+  },
+  timelineContent: {
+    flex: 1,
+  },
+  timelineStatus: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  timelineDate: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  timelineNotes: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontStyle: 'italic',
+  },
+  updateStatusButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#8B5CF6',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  updateStatusButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+  },
+  currentStatusSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  currentStatusLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
+    marginRight: 12,
+  },
+  currentStatusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  currentStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'white',
+  },
+  selectStatusLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  notesLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginTop: 16,
+    marginBottom: 8,
   },
 });

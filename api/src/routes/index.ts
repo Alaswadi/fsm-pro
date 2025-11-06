@@ -8,6 +8,11 @@ import inventoryRoutes from './inventory';
 import uploadRoutes from './upload';
 import jobsRoutes from './jobs';
 import dashboardRoutes from './dashboard';
+import workshopSettingsRoutes from './workshopSettings';
+import intakeRoutes from './intake';
+import statusRoutes from './status';
+import workshopRoutes from './workshop';
+import invoiceRoutes from './invoices';
 import { query } from '../config/database';
 
 const router = Router();
@@ -53,5 +58,10 @@ router.use('/equipment', equipmentRoutes);
 router.use('/inventory', inventoryRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/jobs', jobsRoutes);
+router.use('/workshop/settings', workshopSettingsRoutes);
+router.use('/workshop/intake', intakeRoutes);
+router.use('/workshop/status', statusRoutes);
+router.use('/workshop', workshopRoutes);
+router.use('/invoices', invoiceRoutes);
 
 export default router;

@@ -26,6 +26,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
       path: '/work-orders',
     },
     {
+      id: 'workshop-queue',
+      label: 'Workshop Queue',
+      icon: 'ri-tools-fill',
+      path: '/workshop-queue',
+    },
+    {
+      id: 'workshop-metrics',
+      label: 'Workshop Metrics',
+      icon: 'ri-line-chart-line',
+      path: '/workshop-metrics',
+    },
+    {
       id: 'technicians',
       label: 'Technicians',
       icon: 'ri-user-settings-line',

@@ -1,18 +1,21 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Color system matching the mobdesign HTML files
+ * Primary: #3B82F6 (Blue)
+ * Uses the centralized Theme configuration
  */
 
-const tintColorLight = '#0a7ea4';
+import { Theme } from './Theme';
+
+const tintColorLight = Theme.colors.primary.DEFAULT;
 const tintColorDark = '#fff';
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
+    text: Theme.colors.text.primary,
+    background: Theme.colors.background.primary,
     tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
+    icon: Theme.colors.gray[600],
+    tabIconDefault: Theme.colors.gray[400],
     tabIconSelected: tintColorLight,
   },
   dark: {

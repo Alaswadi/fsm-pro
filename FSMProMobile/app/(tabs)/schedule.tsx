@@ -11,289 +11,267 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Calendar, DateData } from 'react-native-calendars';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Job } from '../../src/types';
 import { apiService } from '../../src/services/api';
+import { Theme } from '@/constants/Theme';
+import { FilterChip } from '@/components/ui/FilterChip';
+import { ThemedText } from '@/components/ThemedText';
+import { AppHeader } from '@/components/ui/AppHeader';
+import { AppFooter } from '@/components/ui/AppFooter';
+
+type ViewMode = 'day' | 'week' | 'month';
+type FilterType = 'all' | 'high_priority' | 'maintenance' | 'inspection' | 'emergency';
 
 export default function ScheduleScreen() {
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [markedDates, setMarkedDates] = useState<any>({});
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [filter, setFilter] = useState<FilterType>('all');
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<number | null>(new Date().getDate());
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    loadAllScheduledJobs();
+    loadJobs();
   }, []);
 
-  useEffect(() => {
-    filterJobsByDate();
-  }, [selectedDate, allJobs]);
-
-  const loadAllScheduledJobs = async () => {
+  const loadJobs = async () => {
     try {
       setIsLoading(true);
-      
-      // Fetch all jobs to show in calendar
       const response = await apiService.getJobs({});
-      
-      console.log('Schedule API Response:', response);
-      
+
       if (response.success && response.data) {
-        const allJobsList = response.data.jobs || [];
-        console.log('Total jobs fetched:', allJobsList.length);
-        
-        // Show all jobs that have a scheduled_date (regardless of status)
-        const jobsWithDates = allJobsList.filter(job => 
-          job.scheduled_date && job.status !== 'cancelled'
-        );
-        
-        console.log('Jobs with scheduled dates:', jobsWithDates.length);
-        console.log('Jobs data:', jobsWithDates);
-        
-        setAllJobs(jobsWithDates);
-        generateMarkedDates(jobsWithDates);
+        setJobs(response.data.jobs || []);
       } else {
-        console.error('Failed to load jobs:', response.error);
         Alert.alert('Error', response.error || 'Failed to load schedule');
       }
     } catch (error) {
-      console.error('Exception loading jobs:', error);
       Alert.alert('Error', 'Failed to load schedule');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const generateMarkedDates = (jobsList: Job[]) => {
-    const marked: any = {};
-    
-    jobsList.forEach(job => {
-      const dateKey = job.scheduled_date.split('T')[0];
-      if (!marked[dateKey]) {
-        marked[dateKey] = { 
-          marked: true, 
-          dotColor: '#ea2a33',
-          dots: [{ color: '#ea2a33' }]
-        };
-      }
-    });
-
-    // Add selected date styling
-    if (marked[selectedDate]) {
-      marked[selectedDate] = {
-        ...marked[selectedDate],
-        selected: true,
-        selectedColor: '#ea2a33',
-      };
-    } else {
-      marked[selectedDate] = {
-        selected: true,
-        selectedColor: '#ea2a33',
-      };
-    }
-
-    setMarkedDates(marked);
-  };
-
-  const filterJobsByDate = () => {
-    const filteredJobs = allJobs.filter(job => 
-      job.scheduled_date.startsWith(selectedDate)
-    );
-    setJobs(filteredJobs);
-  };
-
   const onRefresh = async () => {
     setIsRefreshing(true);
-    await loadAllScheduledJobs();
+    await loadJobs();
     setIsRefreshing(false);
   };
 
-  const onDayPress = (day: DateData) => {
-    setSelectedDate(day.dateString);
-    const marked = { ...markedDates };
-    
-    // Remove previous selection
-    Object.keys(marked).forEach(key => {
-      if (marked[key].selected) {
-        marked[key] = { ...marked[key], selected: false };
-        delete marked[key].selectedColor;
-      }
-    });
-
-    // Add new selection
-    marked[day.dateString] = {
-      ...marked[day.dateString],
-      selected: true,
-      selectedColor: '#ea2a33',
-    };
-
-    setMarkedDates(marked);
+  const goToPreviousMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
   };
 
-  const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
+  const goToNextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
   };
 
-  const formatSelectedDate = (dateString: string) => {
-    const date = new Date(dateString + 'T00:00:00');
-    return date.toLocaleDateString([], { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+  const getMonthName = () => {
+    return currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
 
-  const getPriorityColor = (priority: Job['priority']) => {
-    switch (priority) {
-      case 'urgent': return '#EF4444';
-      case 'high': return '#F59E0B';
-      case 'medium': return '#3B82F6';
-      case 'low': return '#10B981';
-      default: return '#6B7280';
+  const getDaysInMonth = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    const days: Array<{ day: number; isCurrentMonth: boolean; isToday: boolean }> = [];
+
+    // Previous month days
+    for (let i = firstDay - 1; i >= 0; i--) {
+      days.push({
+        day: daysInPrevMonth - i,
+        isCurrentMonth: false,
+        isToday: false,
+      });
     }
-  };
 
-  const getStatusColor = (status: Job['status']) => {
-    switch (status) {
-      case 'scheduled': return '#3B82F6';
-      case 'in_progress': return '#F59E0B';
-      case 'completed': return '#10B981';
-      case 'cancelled': return '#EF4444';
-      default: return '#6B7280';
+    // Current month days
+    const today = new Date();
+    const isCurrentMonth = today.getMonth() === month && today.getFullYear() === year;
+
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push({
+        day: i,
+        isCurrentMonth: true,
+        isToday: isCurrentMonth && today.getDate() === i,
+      });
     }
+
+    // Next month days to fill the grid
+    const remainingDays = 42 - days.length; // 6 rows * 7 days
+    for (let i = 1; i <= remainingDays; i++) {
+      days.push({
+        day: i,
+        isCurrentMonth: false,
+        isToday: false,
+      });
+    }
+
+    return days;
   };
 
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#ea2a33" />
-        <Text style={styles.loadingText}>Loading schedule...</Text>
+        <ActivityIndicator size="large" color={Theme.colors.primary.DEFAULT} />
+        <ThemedText type="body" style={styles.loadingText}>Loading schedule...</ThemedText>
       </View>
     );
   }
 
+  const days = getDaysInMonth();
+  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
   return (
     <View style={styles.container}>
+      {/* Header */}
+      <AppHeader title="Schedule" />
+
       <ScrollView
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={onRefresh}
-            colors={['#ea2a33']}
+            colors={[Theme.colors.primary.DEFAULT]}
+            tintColor={Theme.colors.primary.DEFAULT}
           />
         }
       >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Schedule</Text>
-        </View>
-
-        <View style={styles.calendarContainer}>
-          <Calendar
-            current={selectedDate}
-            onDayPress={onDayPress}
-            markedDates={markedDates}
-            theme={{
-              backgroundColor: '#ffffff',
-              calendarBackground: '#ffffff',
-              textSectionTitleColor: '#6B7280',
-              selectedDayBackgroundColor: '#ea2a33',
-              selectedDayTextColor: '#ffffff',
-              todayTextColor: '#ea2a33',
-              dayTextColor: '#111827',
-              textDisabledColor: '#D1D5DB',
-              dotColor: '#ea2a33',
-              selectedDotColor: '#ffffff',
-              arrowColor: '#ea2a33',
-              monthTextColor: '#111827',
-              indicatorColor: '#ea2a33',
-              textDayFontFamily: 'System',
-              textMonthFontFamily: 'System',
-              textDayHeaderFontFamily: 'System',
-              textDayFontWeight: '400',
-              textMonthFontWeight: '600',
-              textDayHeaderFontWeight: '500',
-              textDayFontSize: 16,
-              textMonthFontSize: 18,
-              textDayHeaderFontSize: 14,
-            }}
-            style={styles.calendar}
-          />
-        </View>
-
-        <View style={styles.jobsSection}>
-          <View style={styles.jobsHeader}>
-            <Text style={styles.jobsHeaderTitle}>
-              {formatSelectedDate(selectedDate)}
-            </Text>
-            <Text style={styles.jobsCount}>
-              {jobs.length} {jobs.length === 1 ? 'job' : 'jobs'}
-            </Text>
+        <View style={styles.content}>
+          {/* View Mode Toggle */}
+          <View style={styles.viewModeContainer}>
+            <TouchableOpacity
+              style={[styles.viewModeButton, viewMode === 'day' && styles.viewModeButtonActive]}
+              onPress={() => setViewMode('day')}
+            >
+              <Text style={[styles.viewModeText, viewMode === 'day' && styles.viewModeTextActive]}>
+                Day
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.viewModeButton, viewMode === 'week' && styles.viewModeButtonActive]}
+              onPress={() => setViewMode('week')}
+            >
+              <Text style={[styles.viewModeText, viewMode === 'week' && styles.viewModeTextActive]}>
+                Week
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.viewModeButton, viewMode === 'month' && styles.viewModeButtonActive]}
+              onPress={() => setViewMode('month')}
+            >
+              <Text style={[styles.viewModeText, viewMode === 'month' && styles.viewModeTextActive]}>
+                Month
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          {jobs.length > 0 ? (
-            jobs.map((job) => (
-              <TouchableOpacity
-                key={job.id}
-                style={styles.jobCard}
-                onPress={() => router.push(`/work-order-details?id=${job.id}`)}
-              >
-                <View style={styles.timeContainer}>
-                  <Text style={styles.timeText}>{formatTime(job.scheduled_date)}</Text>
-                  {job.estimated_duration && (
-                    <Text style={styles.durationText}>
-                      {job.estimated_duration}h
-                    </Text>
-                  )}
+          {/* Month Navigation */}
+          <View style={styles.monthNavigation}>
+            <TouchableOpacity style={styles.navButton} onPress={goToPreviousMonth}>
+              <Ionicons name="chevron-back" size={20} color={Theme.colors.text.secondary} />
+            </TouchableOpacity>
+            <ThemedText type="subheading" style={styles.monthTitle}>
+              {getMonthName()}
+            </ThemedText>
+            <TouchableOpacity style={styles.navButton} onPress={goToNextMonth}>
+              <Ionicons name="chevron-forward" size={20} color={Theme.colors.text.secondary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Filter Chips */}
+          <View style={styles.filterWrapper}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterContainer}
+            >
+              <FilterChip
+                label="All"
+                active={filter === 'all'}
+                onPress={() => setFilter('all')}
+                style={styles.filterChip}
+              />
+              <FilterChip
+                label="High Priority"
+                active={filter === 'high_priority'}
+                onPress={() => setFilter('high_priority')}
+                style={styles.filterChip}
+              />
+              <FilterChip
+                label="Maintenance"
+                active={filter === 'maintenance'}
+                onPress={() => setFilter('maintenance')}
+                style={styles.filterChip}
+              />
+              <FilterChip
+                label="Inspection"
+                active={filter === 'inspection'}
+                onPress={() => setFilter('inspection')}
+                style={styles.filterChip}
+              />
+              <FilterChip
+                label="Emergency"
+                active={filter === 'emergency'}
+                onPress={() => setFilter('emergency')}
+                style={styles.filterChip}
+              />
+            </ScrollView>
+          </View>
+
+          {/* Calendar */}
+          <View style={styles.calendarCard}>
+            {/* Week Days Header */}
+            <View style={styles.weekDaysRow}>
+              {weekDays.map((day) => (
+                <View key={day} style={styles.weekDayCell}>
+                  <Text style={styles.weekDayText}>{day}</Text>
                 </View>
-                
-                <View style={styles.jobContent}>
-                  <View style={styles.jobTitleRow}>
-                    <Text style={styles.jobTitle} numberOfLines={2}>{job.title}</Text>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(job.status) }]}>
-                      <Text style={styles.statusText}>{job.status.replace('_', ' ').toUpperCase()}</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.customerName}>{job.customer_name || 'No customer'}</Text>
-                  
-                  <View style={styles.jobMeta}>
-                    <View style={styles.priorityContainer}>
-                      <View style={[
-                        styles.priorityDot, 
-                        { backgroundColor: getPriorityColor(job.priority) }
-                      ]} />
-                      <Text style={styles.priorityText}>{job.priority.toUpperCase()}</Text>
-                    </View>
-                    
-                    {job.equipment_info && (
-                      <Text style={styles.equipmentText} numberOfLines={1}>
-                        {job.equipment_info}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-                
-                <View style={styles.actionContainer}>
-                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-                </View>
-              </TouchableOpacity>
-            ))
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
-              <Text style={styles.emptyText}>No jobs scheduled</Text>
-              <Text style={styles.emptySubtext}>
-                You have no jobs scheduled for this date
-              </Text>
+              ))}
             </View>
-          )}
+
+            {/* Calendar Grid */}
+            <View style={styles.calendarGrid}>
+              {days.map((dayInfo, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.dayCell,
+                    dayInfo.isToday && styles.todayCell,
+                    selectedDate === dayInfo.day && dayInfo.isCurrentMonth && styles.selectedDayCell,
+                  ]}
+                  onPress={() => dayInfo.isCurrentMonth && setSelectedDate(dayInfo.day)}
+                >
+                  <Text
+                    style={[
+                      styles.dayText,
+                      !dayInfo.isCurrentMonth && styles.dayTextInactive,
+                      dayInfo.isToday && styles.todayText,
+                      selectedDate === dayInfo.day && dayInfo.isCurrentMonth && styles.selectedDayText,
+                    ]}
+                  >
+                    {dayInfo.day}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         </View>
       </ScrollView>
+
+      {/* FAB */}
+      <TouchableOpacity style={styles.fab}>
+        <Ionicons name="add" size={28} color={Theme.colors.white} />
+      </TouchableOpacity>
+
+      {/* Footer */}
+      <AppFooter />
     </View>
   );
 }
@@ -301,178 +279,163 @@ export default function ScheduleScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Theme.colors.background.primary,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Theme.colors.background.primary,
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6B7280',
+    marginTop: Theme.spacing.lg,
   },
   header: {
-    backgroundColor: 'white',
-    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Theme.colors.white,
+    paddingHorizontal: Theme.spacing.lg,
     paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: Theme.spacing.md,
+    ...Theme.shadows.sm,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.md,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.md,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontSize: Theme.typography.fontSizes.lg,
   },
-  calendarContainer: {
-    backgroundColor: 'white',
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
-  },
-  calendar: {
-    paddingBottom: 10,
-  },
-  jobsSection: {
-    padding: 20,
-  },
-  jobsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  iconButton: {
+    width: 32,
+    height: 32,
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  jobsHeaderTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    flex: 1,
-  },
-  jobsCount: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  jobCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  timeContainer: {
-    alignItems: 'center',
-    marginRight: 16,
-    minWidth: 60,
-  },
-  timeText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  durationText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  jobContent: {
-    flex: 1,
-  },
-  jobTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 4,
-  },
-  jobTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    flex: 1,
-    marginRight: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: 'white',
-  },
-  customerName: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
-  jobMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  priorityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  priorityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  priorityText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  equipmentText: {
-    fontSize: 12,
-    color: '#6B7280',
-    flex: 1,
-    textAlign: 'right',
-    marginLeft: 16,
-  },
-  actionContainer: {
-    marginLeft: 12,
-  },
-  emptyContainer: {
-    flex: 1,
     justifyContent: 'center',
+  },
+  content: {
+    padding: Theme.spacing.lg,
+  },
+  viewModeContainer: {
+    flexDirection: 'row',
+    backgroundColor: Theme.colors.gray[100],
+    borderRadius: Theme.borderRadius.lg,
+    padding: 4,
+    marginBottom: Theme.spacing.lg,
+  },
+  viewModeButton: {
+    flex: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    borderRadius: Theme.borderRadius.md,
     alignItems: 'center',
-    paddingVertical: 60,
   },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginTop: 16,
-    marginBottom: 8,
+  viewModeButtonActive: {
+    backgroundColor: Theme.colors.white,
+    ...Theme.shadows.sm,
   },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    paddingHorizontal: 32,
+  viewModeText: {
+    fontSize: Theme.typography.fontSizes.sm,
+    fontWeight: Theme.typography.fontWeights.medium,
+    color: Theme.colors.text.secondary,
+  },
+  viewModeTextActive: {
+    color: Theme.colors.text.primary,
+  },
+  monthNavigation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Theme.spacing.lg,
+  },
+  navButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+  },
+  monthTitle: {
+    fontSize: Theme.typography.fontSizes.xl,
+    fontWeight: Theme.typography.fontWeights.semibold,
+  },
+  filterWrapper: {
+    marginBottom: Theme.spacing.lg,
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  filterChip: {
+    marginRight: Theme.spacing.sm,
+  },
+  calendarCard: {
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.lg,
+    padding: Theme.spacing.lg,
+    ...Theme.shadows.sm,
+  },
+  weekDaysRow: {
+    flexDirection: 'row',
+    marginBottom: Theme.spacing.sm,
+  },
+  weekDayCell: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Theme.spacing.sm,
+  },
+  weekDayText: {
+    fontSize: Theme.typography.fontSizes.xs,
+    fontWeight: Theme.typography.fontWeights.medium,
+    color: Theme.colors.text.tertiary,
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  dayCell: {
+    width: '14.28%', // 100% / 7 days
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Theme.borderRadius.md,
+  },
+  todayCell: {
+    backgroundColor: Theme.colors.primary.DEFAULT,
+  },
+  selectedDayCell: {
+    backgroundColor: Theme.colors.primary.DEFAULT,
+  },
+  dayText: {
+    fontSize: Theme.typography.fontSizes.sm,
+    fontWeight: Theme.typography.fontWeights.medium,
+    color: Theme.colors.text.primary,
+  },
+  dayTextInactive: {
+    color: Theme.colors.gray[300],
+  },
+  todayText: {
+    color: Theme.colors.white,
+  },
+  selectedDayText: {
+    color: Theme.colors.white,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 90,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Theme.colors.primary.DEFAULT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Theme.shadows.lg,
   },
 });

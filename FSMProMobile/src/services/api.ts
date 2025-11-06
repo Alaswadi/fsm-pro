@@ -1,16 +1,20 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { 
-  ApiResponse, 
-  LoginCredentials, 
-  AuthResponse, 
-  User, 
-  Job, 
-  Technician, 
-  Customer, 
-  Equipment, 
+import { Platform } from 'react-native';
+import {
+  ApiResponse,
+  LoginCredentials,
+  AuthResponse,
+  User,
+  Job,
+  Technician,
+  Customer,
+  Equipment,
   InventoryItem,
-  FileUploadResponse 
+  FileUploadResponse,
+  EquipmentIntake,
+  EquipmentStatus,
+  EquipmentStatusHistory
 } from '../types';
 
 class ApiService {
@@ -21,12 +25,12 @@ class ApiService {
     // Use appropriate API URL based on platform
     if (__DEV__) {
       // Development environment
-      if (typeof window !== 'undefined') {
+      if (Platform.OS === 'web') {
         // Web environment
         this.baseURL = 'http://localhost:3001/api';
       } else {
-        // Mobile environment (Android emulator)
-        this.baseURL = 'http://10.0.2.2:3001/api';
+        // Mobile environment (iOS/Android) - use network IP for physical device/emulator on network
+        this.baseURL = 'http://192.168.0.59:3001/api';
       }
     } else {
       // Production environment
@@ -150,6 +154,8 @@ class ApiService {
   async getJobs(params?: {
     status?: string;
     technician_id?: string;
+    customer_id?: string;
+    location_type?: string;
     page?: number;
     limit?: number;
   }): Promise<ApiResponse<{ jobs: Job[]; total: number; page: number; totalPages: number }>> {
@@ -159,8 +165,8 @@ class ApiService {
 
       const requestParams = {
         ...params,
-        // Always filter by current technician for mobile app
-        technician_id: currentTechnicianId || params?.technician_id,
+        // Always filter by current technician for mobile app (unless customer_id is provided)
+        technician_id: params?.customer_id ? undefined : (currentTechnicianId || params?.technician_id),
       };
 
       const response = await this.api.get('/jobs', { params: requestParams });
@@ -182,7 +188,11 @@ class ApiService {
       // Get technician record for this user
       const techniciansResponse = await this.getTechnicians();
       if (techniciansResponse.success && techniciansResponse.data) {
-        const technician = techniciansResponse.data.find(t => t.user_id === user.id);
+        // API returns {technicians, pagination}, not a direct array
+        const technicians = (techniciansResponse.data as any).technicians || techniciansResponse.data;
+        const technician = Array.isArray(technicians)
+          ? technicians.find((t: any) => t.user_id === user.id)
+          : null;
         return technician?.id || null;
       }
 
@@ -416,6 +426,83 @@ class ApiService {
         newPassword
       });
       return this.handleResponse(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  // Workshop endpoints
+  async getCustomerWorkshopJobs(customerId: string): Promise<ApiResponse<Job[]>> {
+    try {
+      const response = await this.api.get(`/workshop/customer/${customerId}/jobs`);
+      return this.handleResponse<Job[]>(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  async getWorkshopJobDetails(jobId: string): Promise<ApiResponse<Job>> {
+    try {
+      const response = await this.api.get(`/workshop/jobs/${jobId}`);
+      return this.handleResponse<Job>(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  async getWorkshopQueue(params?: {
+    sort_by?: string;
+    equipment_type?: string;
+    priority?: string;
+  }): Promise<ApiResponse<Job[]>> {
+    try {
+      const response = await this.api.get('/workshop/queue', { params });
+      return this.handleResponse<Job[]>(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  async claimWorkshopJob(jobId: string): Promise<ApiResponse<Job>> {
+    try {
+      const response = await this.api.post(`/workshop/jobs/${jobId}/claim`);
+      return this.handleResponse<Job>(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  async getEquipmentIntake(jobId: string): Promise<ApiResponse<EquipmentIntake>> {
+    try {
+      const response = await this.api.get(`/workshop/intake/${jobId}`);
+      return this.handleResponse<EquipmentIntake>(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  async getEquipmentStatus(jobId: string): Promise<ApiResponse<EquipmentStatus>> {
+    try {
+      const response = await this.api.get(`/workshop/status/${jobId}`);
+      return this.handleResponse<EquipmentStatus>(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  async getEquipmentStatusHistory(jobId: string): Promise<ApiResponse<EquipmentStatusHistory[]>> {
+    try {
+      const response = await this.api.get(`/workshop/status/${jobId}/history`);
+      return this.handleResponse<EquipmentStatusHistory[]>(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  async updateEquipmentStatus(jobId: string, status: string, notes?: string): Promise<ApiResponse<EquipmentStatus>> {
+    try {
+      const response = await this.api.put(`/workshop/status/${jobId}`, { status, notes });
+      return this.handleResponse<EquipmentStatus>(response);
     } catch (error) {
       return this.handleError(error);
     }

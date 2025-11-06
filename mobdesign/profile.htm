@@ -1,0 +1,864 @@
+<html lang="en"><head><script>
+(function(){
+  let proxyEcharts = null;
+
+  let originInit = null;
+
+  const DefaultFontOptions = [
+      { key: 'xAxis', stylePath: 'xAxis.axisLabel' },
+      { key: 'yAxis', stylePath: 'yAxis.axisLabel' },
+      { key: 'legend', stylePath: 'legend.textStyle' },
+      { key: 'tooltip', stylePath: 'tooltip.textStyle' },
+      { key: 'title', stylePath: 'title.textStyle' },
+      { key: 'series', stylePath: 'series.n.label', isArray: true },
+  ];
+
+  function setVal(source, keys, val, setFn) {
+      if (!Array.isArray(keys)) {
+          keys = keys.split('.');
+      }
+      keys = [...keys];
+      const valKey = keys.pop();
+      while (keys.length) {
+          const parentKey = keys.shift();
+          if (typeof source[parentKey] !== 'object' && typeof source[parentKey] !== 'function') {
+              const childKey = keys[0] === undefined ? valKey : keys[0];
+              let newVal = {};
+              if (!isNaN(childKey * 1)) {
+                  newVal = [];
+              }
+              if (setFn) {
+                  setFn(source, parentKey, newVal);
+              } else {
+                  source[parentKey] = newVal;
+              }
+          }
+          source = source[parentKey];
+      }
+      if (setFn) {
+          setFn(source, valKey, val);
+      } else {
+          source[valKey] = val;
+      }
+  }
+
+  function setFontFamily(options) {
+      return options;
+  }
+
+  function setSeriesFamily(options) {
+      if (options.series) {
+          options.series = options.series.map(item => {
+              item.label = { ...item.label };
+              return item;
+          });
+      }
+      return options;
+  }
+
+
+  function addResizeListener(echartsInstance) {
+      const mountDom = echartsInstance.getDom();
+      const resizeObserver = new ResizeObserver(() => {
+          echartsInstance.resize();
+      });
+      resizeObserver.observe(mountDom);
+      return resizeObserver;
+  }
+
+  function proxyInit(...arg) {
+      if (!originInit) return null;
+      let instance = null;
+      try {
+        instance = originInit.apply(this, arg);
+      } catch (e) {
+        console.error(e);
+        const div = document.createElement('div');
+        div.style.display = 'none';
+        document.body.appendChild(div);
+        instance = originInit.call(this, div);
+        document.body.removeChild(div);
+      }
+      const originSetOption = instance.setOption;
+      addResizeListener(instance);
+      instance.setOption = async function setOptionProxy(options) {
+          options = options || {};
+          options.animation = false;
+          try {
+            return originSetOption.call(this, options);
+          } catch (e) {
+            console.error(e);
+            return originSetOption.call(this, {});
+          }
+      };
+      return instance;
+  }
+
+  Object.defineProperty(globalThis, 'echarts', {
+      get() {
+          return proxyEcharts;
+      },
+      set(value) {
+          originInit = value.init;
+          defineInit(value);
+          proxyEcharts = value;
+      },
+      configurable: true,
+  });
+
+  function defineInit(value) {
+      Object.defineProperty(value, 'init', {
+          get() {
+              return proxyInit;
+          },
+          set(v) {
+              originInit = v;
+          },
+          enumerable: true,
+      });
+  }
+})()
+</script><script>console.warn = () => {};console.log = () => {};</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FSM Pro - Profile</title>
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Pacifico&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.6.0/remixicon.min.css">
+<script>
+tailwind.config = {
+theme: {
+extend: {
+colors: {
+primary: '#3B82F6',
+secondary: '#1E40AF'
+},
+borderRadius: {
+'none': '0px',
+'sm': '4px',
+DEFAULT: '8px',
+'md': '12px',
+'lg': '16px',
+'xl': '20px',
+'2xl': '24px',
+'3xl': '32px',
+'full': '9999px',
+'button': '8px'
+}
+}
+}
+}
+</script>
+<style>
+:where([class^="ri-"])::before {
+content: "\f3c2";
+}
+.slide-in {
+animation: slideIn 0.3s ease-out;
+}
+@keyframes slideIn {
+from { transform: translateY(20px); opacity: 0; }
+to { transform: translateY(0); opacity: 1; }
+}
+.toggle-switch {
+position: relative;
+width: 48px;
+height: 24px;
+background-color: #e5e7eb;
+border-radius: 12px;
+transition: background-color 0.3s ease;
+cursor: pointer;
+}
+.toggle-switch.active {
+background-color: #3B82F6;
+}
+.toggle-switch::after {
+content: '';
+position: absolute;
+top: 2px;
+left: 2px;
+width: 20px;
+height: 20px;
+background-color: white;
+border-radius: 50%;
+transition: transform 0.3s ease;
+}
+.toggle-switch.active::after {
+transform: translateX(24px);
+}
+.bottom-sheet {
+transform: translateY(100%);
+transition: transform 0.3s ease;
+}
+.bottom-sheet.open {
+transform: translateY(0);
+}
+</style>
+<script>
+    // window.setInterval = () => {};
+    // window.clearInterval = () => {};
+    // window.setTimeout = () => {};
+    // window.clearTimeout = () => {};
+  </script><style>
+    /* 自定义滚动条样式 */
+    /* WebKit 浏览器 (Chrome, Safari, Edge) */
+    ::-webkit-scrollbar {
+        width: 0; /* 滚动条宽度 */
+        height: 0; /* 水平滚动条高度 */
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent; /* 轨道透明，使内容可见 */
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.5); /* 滚动条滑块颜色 */
+        border-radius: 4px; /* 滑块圆角 */
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(0, 0, 0, 0.7); /* 悬停时颜色 */
+    }
+  </style><script>
+  window.addEventListener('load', () => {
+    if (typeof AOS !== 'undefined' && AOS) {
+      AOS.refresh?.();
+    }
+  });
+</script><script>(function () {
+  // 内存存储
+  const memoryStorage = {
+    local: new Map(),
+    session: new Map()
+  };
+
+  // 保存原始方法
+  // const originalLocalStorage = {
+  //   setItem: localStorage.setItem.bind(localStorage),
+  //   getItem: localStorage.getItem.bind(localStorage),
+  //   removeItem: localStorage.removeItem.bind(localStorage),
+  //   clear: localStorage.clear.bind(localStorage),
+  //   key: localStorage.key.bind(localStorage)
+  // };
+
+  // const originalSessionStorage = {
+  //   setItem: sessionStorage.setItem.bind(sessionStorage),
+  //   getItem: sessionStorage.getItem.bind(sessionStorage),
+  //   removeItem: sessionStorage.removeItem.bind(sessionStorage),
+  //   clear: sessionStorage.clear.bind(sessionStorage),
+  //   key: sessionStorage.key.bind(sessionStorage)
+  // };
+
+  // 只重写方法，不动属性
+  localStorage.setItem = function (key, value) {
+    memoryStorage.local.set(key, value);
+  };
+
+  localStorage.getItem = function (key) {
+    return memoryStorage.local.get(key) ?? null;
+  };
+
+  localStorage.removeItem = function (key) {
+    memoryStorage.local.delete(key);
+  };
+
+  localStorage.clear = function () {
+    memoryStorage.local.clear();
+  };
+
+  localStorage.key = function (n) {
+    return Array.from(memoryStorage.local.keys())[n] ?? null;
+  };
+
+  // sessionStorage 同样的处理
+  sessionStorage.setItem = function (key, value) {
+    memoryStorage.session.set(key, value);
+  };
+
+  sessionStorage.getItem = function (key) {
+    return memoryStorage.session.get(key) ?? null;
+  };
+
+  sessionStorage.removeItem = function (key) {
+    memoryStorage.session.delete(key);
+  };
+
+  sessionStorage.clear = function () {
+    memoryStorage.session.clear();
+  };
+
+  sessionStorage.key = function (n) {
+    return Array.from(memoryStorage.session.keys())[n] ?? null;
+  };
+})();
+</script><style>*, ::before, ::after{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/* ! tailwindcss v3.4.16 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}.inset-0{inset:0px}.-bottom-1{bottom:-0.25rem}.-right-1{right:-0.25rem}.bottom-0{bottom:0px}.left-0{left:0px}.right-0{right:0px}.top-0{top:0px}.z-50{z-index:50}.mx-auto{margin-left:auto;margin-right:auto}.mb-1{margin-bottom:0.25rem}.mb-4{margin-bottom:1rem}.mb-6{margin-bottom:1.5rem}.mb-8{margin-bottom:2rem}.flex{display:flex}.grid{display:grid}.hidden{display:none}.h-1{height:0.25rem}.h-16{height:4rem}.h-24{height:6rem}.h-4{height:1rem}.h-5{height:1.25rem}.h-6{height:1.5rem}.h-8{height:2rem}.h-full{height:100%}.w-12{width:3rem}.w-24{width:6rem}.w-4{width:1rem}.w-5{width:1.25rem}.w-6{width:1.5rem}.w-8{width:2rem}.w-full{width:100%}.cursor-pointer{cursor:pointer}.grid-cols-5{grid-template-columns:repeat(5, minmax(0, 1fr))}.flex-col{flex-direction:column}.items-center{align-items:center}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.space-x-2 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(0.5rem * var(--tw-space-x-reverse));margin-left:calc(0.5rem * calc(1 - var(--tw-space-x-reverse)))}.space-x-3 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(0.75rem * var(--tw-space-x-reverse));margin-left:calc(0.75rem * calc(1 - var(--tw-space-x-reverse)))}.space-y-1 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.25rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.25rem * var(--tw-space-y-reverse))}.space-y-3 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.75rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.75rem * var(--tw-space-y-reverse))}.space-y-4 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem * var(--tw-space-y-reverse))}.overflow-hidden{overflow:hidden}.\!rounded-button{border-radius:8px !important}.rounded-full{border-radius:9999px}.rounded-lg{border-radius:16px}.rounded-t-xl{border-top-left-radius:20px;border-top-right-radius:20px}.border-t{border-top-width:1px}.border-gray-200{--tw-border-opacity:1;border-color:rgb(229 231 235 / var(--tw-border-opacity, 1))}.bg-black{--tw-bg-opacity:1;background-color:rgb(0 0 0 / var(--tw-bg-opacity, 1))}.bg-gray-100{--tw-bg-opacity:1;background-color:rgb(243 244 246 / var(--tw-bg-opacity, 1))}.bg-gray-200{--tw-bg-opacity:1;background-color:rgb(229 231 235 / var(--tw-bg-opacity, 1))}.bg-gray-300{--tw-bg-opacity:1;background-color:rgb(209 213 219 / var(--tw-bg-opacity, 1))}.bg-gray-50{--tw-bg-opacity:1;background-color:rgb(249 250 251 / var(--tw-bg-opacity, 1))}.bg-primary{--tw-bg-opacity:1;background-color:rgb(59 130 246 / var(--tw-bg-opacity, 1))}.bg-red-50{--tw-bg-opacity:1;background-color:rgb(254 242 242 / var(--tw-bg-opacity, 1))}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity, 1))}.bg-opacity-50{--tw-bg-opacity:0.5}.object-cover{object-fit:cover}.p-4{padding:1rem}.px-4{padding-left:1rem;padding-right:1rem}.py-3{padding-top:0.75rem;padding-bottom:0.75rem}.py-6{padding-top:1.5rem;padding-bottom:1.5rem}.pb-20{padding-bottom:5rem}.pt-16{padding-top:4rem}.font-sans{font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"}.text-base{font-size:1rem;line-height:1.5rem}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:0.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:0.75rem;line-height:1rem}.font-medium{font-weight:500}.font-semibold{font-weight:600}.text-gray-400{--tw-text-opacity:1;color:rgb(156 163 175 / var(--tw-text-opacity, 1))}.text-gray-500{--tw-text-opacity:1;color:rgb(107 114 128 / var(--tw-text-opacity, 1))}.text-gray-600{--tw-text-opacity:1;color:rgb(75 85 99 / var(--tw-text-opacity, 1))}.text-gray-700{--tw-text-opacity:1;color:rgb(55 65 81 / var(--tw-text-opacity, 1))}.text-gray-900{--tw-text-opacity:1;color:rgb(17 24 39 / var(--tw-text-opacity, 1))}.text-primary{--tw-text-opacity:1;color:rgb(59 130 246 / var(--tw-text-opacity, 1))}.text-red-600{--tw-text-opacity:1;color:rgb(220 38 38 / var(--tw-text-opacity, 1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.shadow-sm{--tw-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}</style></head>
+<body class="bg-gray-50 font-sans">
+<header class="fixed top-0 w-full bg-white shadow-sm z-50">
+<div class="flex items-center justify-between px-4 py-3">
+<a href="https://readdy.ai/home/b6fe40ca-771d-48ff-a2fd-0c4fd884e51a/a613ccd6-16e4-4a8a-a15c-71e4939d2693" data-readdy="true" class="w-8 h-8 flex items-center justify-center cursor-pointer">
+<i class="ri-arrow-left-line text-xl text-gray-700"></i>
+</a>
+<h1 class="text-lg font-semibold text-gray-900">Profile</h1>
+<div class="w-8 h-8 flex items-center justify-center cursor-pointer" id="settingsBtn">
+<i class="ri-settings-line text-xl text-gray-700"></i>
+</div>
+</div>
+</header>
+
+<main class="pt-16 pb-20">
+<div class="px-4 py-6">
+<div class="flex flex-col items-center mb-8">
+<div class="relative mb-4">
+<div class="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+<img src="https://readdy.ai/api/search-image?query=Professional%20technician%20portrait%2C%20friendly%20male%20service%20worker%2C%20clean%20background%2C%20business%20headshot%20style%2C%20high%20quality%20photo&amp;width=96&amp;height=96&amp;seq=profile-avatar&amp;orientation=squarish" alt="Profile Avatar" class="w-full h-full object-cover">
+</div>
+<div class="absolute -bottom-1 -right-1 w-8 h-8 bg-primary rounded-full flex items-center justify-center cursor-pointer">
+<i class="ri-camera-line text-white text-sm"></i>
+</div>
+</div>
+<h2 class="text-xl font-semibold text-gray-900 mb-1">Marcus Johnson</h2>
+<p class="text-sm text-gray-600">Field Service Manager</p>
+</div>
+
+<div class="bg-white rounded-lg p-4 mb-6 shadow-sm">
+<h3 class="text-base font-semibold text-gray-900 mb-4">Contact Information</h3>
+<div class="space-y-4">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full">
+<i class="ri-mail-line text-gray-600"></i>
+</div>
+<div>
+<p class="text-sm font-medium text-gray-900">marcus.johnson@fsmtech.com</p>
+<p class="text-xs text-gray-500">Work Email</p>
+</div>
+</div>
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full">
+<i class="ri-phone-line text-gray-600"></i>
+</div>
+<div>
+<p class="text-sm font-medium text-gray-900">+1 (555) 234-5678</p>
+<p class="text-xs text-gray-500">Mobile Phone</p>
+</div>
+</div>
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full">
+<i class="ri-map-pin-line text-gray-600"></i>
+</div>
+<div>
+<p class="text-sm font-medium text-gray-900">San Francisco, CA</p>
+<p class="text-xs text-gray-500">Service Area</p>
+</div>
+</div>
+</div>
+</div>
+
+<div class="bg-white rounded-lg p-4 mb-6 shadow-sm">
+<h3 class="text-base font-semibold text-gray-900 mb-4">Account Settings</h3>
+<div class="space-y-1">
+<div class="flex items-center justify-between py-3 cursor-pointer" id="notificationsBtn">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 flex items-center justify-center">
+<i class="ri-notification-line text-gray-600"></i>
+</div>
+<span class="text-sm text-gray-900">Notifications</span>
+</div>
+<div class="w-4 h-4 flex items-center justify-center">
+<i class="ri-arrow-right-s-line text-gray-400"></i>
+</div>
+</div>
+<div class="flex items-center justify-between py-3 cursor-pointer" id="themeBtn">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 flex items-center justify-center">
+<i class="ri-palette-line text-gray-600"></i>
+</div>
+<span class="text-sm text-gray-900">Theme Settings</span>
+</div>
+<div class="w-4 h-4 flex items-center justify-center">
+<i class="ri-arrow-right-s-line text-gray-400"></i>
+</div>
+</div>
+<div class="flex items-center justify-between py-3 cursor-pointer" id="privacyBtn">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 flex items-center justify-center">
+<i class="ri-shield-line text-gray-600"></i>
+</div>
+<span class="text-sm text-gray-900">Privacy Settings</span>
+</div>
+<div class="w-4 h-4 flex items-center justify-center">
+<i class="ri-arrow-right-s-line text-gray-400"></i>
+</div>
+</div>
+<div class="flex items-center justify-between py-3 cursor-pointer" id="languageBtn">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 flex items-center justify-center">
+<i class="ri-global-line text-gray-600"></i>
+</div>
+<span class="text-sm text-gray-900">Language</span>
+</div>
+<div class="flex items-center space-x-2">
+<span class="text-xs text-gray-500">English</span>
+<div class="w-4 h-4 flex items-center justify-center">
+<i class="ri-arrow-right-s-line text-gray-400"></i>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between py-3 cursor-pointer" id="helpBtn">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 flex items-center justify-center">
+<i class="ri-question-line text-gray-600"></i>
+</div>
+<span class="text-sm text-gray-900">Help &amp; Support</span>
+</div>
+<div class="w-4 h-4 flex items-center justify-center">
+<i class="ri-arrow-right-s-line text-gray-400"></i>
+</div>
+</div>
+</div>
+</div>
+
+<div class="bg-white rounded-lg p-4 mb-6 shadow-sm">
+<h3 class="text-base font-semibold text-gray-900 mb-4">Preferences</h3>
+<div class="space-y-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 flex items-center justify-center">
+<i class="ri-notification-2-line text-gray-600"></i>
+</div>
+<div>
+<p class="text-sm font-medium text-gray-900">Work Order Alerts</p>
+<p class="text-xs text-gray-500">Get notified about new assignments</p>
+</div>
+</div>
+<div class="toggle-switch active" data-toggle="workorder-alerts"></div>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 flex items-center justify-center">
+<i class="ri-map-pin-2-line text-gray-600"></i>
+</div>
+<div>
+<p class="text-sm font-medium text-gray-900">Location Sharing</p>
+<p class="text-xs text-gray-500">Share location for job tracking</p>
+</div>
+</div>
+<div class="toggle-switch active" data-toggle="location-sharing"></div>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 flex items-center justify-center">
+<i class="ri-download-cloud-line text-gray-600"></i>
+</div>
+<div>
+<p class="text-sm font-medium text-gray-900">Offline Mode</p>
+<p class="text-xs text-gray-500">Download data for offline access</p>
+</div>
+</div>
+<div class="toggle-switch" data-toggle="offline-mode"></div>
+</div>
+</div>
+</div>
+
+<div class="bg-white rounded-lg p-4 mb-6 shadow-sm">
+<div class="space-y-1">
+<div class="flex items-center justify-between py-3 cursor-pointer" id="changePasswordBtn">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 flex items-center justify-center">
+<i class="ri-lock-line text-gray-600"></i>
+</div>
+<span class="text-sm text-gray-900">Change Password</span>
+</div>
+<div class="w-4 h-4 flex items-center justify-center">
+<i class="ri-arrow-right-s-line text-gray-400"></i>
+</div>
+</div>
+<div class="flex items-center justify-between py-3 cursor-pointer" id="dataExportBtn">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 flex items-center justify-center">
+<i class="ri-download-line text-gray-600"></i>
+</div>
+<span class="text-sm text-gray-900">Export Data</span>
+</div>
+<div class="w-4 h-4 flex items-center justify-center">
+<i class="ri-arrow-right-s-line text-gray-400"></i>
+</div>
+</div>
+</div>
+</div>
+
+<div class="px-4">
+<button class="w-full bg-red-50 text-red-600 py-3 rounded-lg font-medium cursor-pointer !rounded-button flex items-center justify-center space-x-2" id="logoutBtn">
+<div class="w-5 h-5 flex items-center justify-center">
+<i class="ri-logout-box-line"></i>
+</div>
+<span>Sign Out</span>
+</button>
+</div>
+</div>
+</main>
+
+<nav class="fixed bottom-0 w-full bg-white border-t border-gray-200 z-50">
+<div class="grid grid-cols-5 h-16">
+<a href="https://readdy.ai/home/b6fe40ca-771d-48ff-a2fd-0c4fd884e51a/a613ccd6-16e4-4a8a-a15c-71e4939d2693" data-readdy="true" class="flex flex-col items-center justify-center space-y-1 cursor-pointer">
+<div class="w-6 h-6 flex items-center justify-center">
+<i class="ri-file-list-line text-gray-400"></i>
+</div>
+<span class="text-xs text-gray-400">Orders</span>
+</a>
+<button class="flex flex-col items-center justify-center space-y-1 cursor-pointer">
+<div class="w-6 h-6 flex items-center justify-center">
+<i class="ri-calendar-line text-gray-400"></i>
+</div>
+<span class="text-xs text-gray-400">Schedule</span>
+</button>
+<button class="flex flex-col items-center justify-center space-y-1 cursor-pointer">
+<div class="w-6 h-6 flex items-center justify-center">
+<i class="ri-box-line text-gray-400"></i>
+</div>
+<span class="text-xs text-gray-400">Inventory</span>
+</button>
+<button class="flex flex-col items-center justify-center space-y-1 cursor-pointer">
+<div class="w-6 h-6 flex items-center justify-center">
+<i class="ri-map-pin-line text-gray-400"></i>
+</div>
+<span class="text-xs text-gray-400">Tracking</span>
+</button>
+<button class="flex flex-col items-center justify-center space-y-1 cursor-pointer">
+<div class="w-6 h-6 flex items-center justify-center">
+<i class="ri-user-fill text-primary"></i>
+</div>
+<span class="text-xs text-primary font-medium">Profile</span>
+</button>
+</div>
+</nav>
+
+<div id="bottomSheet" class="fixed inset-0 z-50 hidden">
+<div class="absolute inset-0 bg-black bg-opacity-50" id="bottomSheetOverlay"></div>
+<div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-xl bottom-sheet">
+<div class="p-4">
+<div class="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
+<h3 class="text-lg font-semibold mb-4" id="sheetTitle">Settings</h3>
+<div class="space-y-3" id="sheetContent">
+</div>
+</div>
+</div>
+</div>
+
+<script id="toggleSwitches">
+document.addEventListener('DOMContentLoaded', function() {
+const toggleSwitches = document.querySelectorAll('.toggle-switch');
+toggleSwitches.forEach(toggle => {
+toggle.addEventListener('click', function() {
+this.classList.toggle('active');
+});
+});
+});
+</script>
+
+<script id="bottomSheetHandler">
+function showBottomSheet(title, content) {
+const bottomSheet = document.getElementById('bottomSheet');
+const sheet = bottomSheet.querySelector('.bottom-sheet');
+const sheetTitle = document.getElementById('sheetTitle');
+const sheetContent = document.getElementById('sheetContent');
+sheetTitle.textContent = title;
+sheetContent.innerHTML = content;
+bottomSheet.classList.remove('hidden');
+setTimeout(() => {
+sheet.classList.add('open');
+}, 10);
+}
+
+function hideBottomSheet() {
+const bottomSheet = document.getElementById('bottomSheet');
+const sheet = bottomSheet.querySelector('.bottom-sheet');
+sheet.classList.remove('open');
+setTimeout(() => {
+bottomSheet.classList.add('hidden');
+}, 300);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+const overlay = document.getElementById('bottomSheetOverlay');
+overlay.addEventListener('click', hideBottomSheet);
+});
+</script>
+
+<script id="settingsHandlers">
+document.addEventListener('DOMContentLoaded', function() {
+const notificationsBtn = document.getElementById('notificationsBtn');
+const themeBtn = document.getElementById('themeBtn');
+const privacyBtn = document.getElementById('privacyBtn');
+const languageBtn = document.getElementById('languageBtn');
+const helpBtn = document.getElementById('helpBtn');
+const changePasswordBtn = document.getElementById('changePasswordBtn');
+const dataExportBtn = document.getElementById('dataExportBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+
+notificationsBtn.addEventListener('click', function() {
+const content = `
+<div class="space-y-4">
+<div class="flex items-center justify-between">
+<span class="text-sm text-gray-900">Push Notifications</span>
+<div class="toggle-switch active"></div>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-sm text-gray-900">Email Notifications</span>
+<div class="toggle-switch active"></div>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-sm text-gray-900">SMS Alerts</span>
+<div class="toggle-switch"></div>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-sm text-gray-900">Sound</span>
+<div class="toggle-switch active"></div>
+</div>
+</div>
+`;
+showBottomSheet('Notification Settings', content);
+});
+
+themeBtn.addEventListener('click', function() {
+const content = `
+<div class="space-y-3">
+<button class="w-full flex items-center justify-between p-3 rounded-lg bg-primary text-white">
+<span>Light Mode</span>
+<i class="ri-check-line"></i>
+</button>
+<button class="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
+<span>Dark Mode</span>
+</button>
+<button class="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
+<span>System Default</span>
+</button>
+</div>
+`;
+showBottomSheet('Theme Settings', content);
+});
+
+privacyBtn.addEventListener('click', function() {
+const content = `
+<div class="space-y-4">
+<div class="flex items-center justify-between">
+<span class="text-sm text-gray-900">Data Collection</span>
+<div class="toggle-switch active"></div>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-sm text-gray-900">Analytics</span>
+<div class="toggle-switch"></div>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-sm text-gray-900">Crash Reports</span>
+<div class="toggle-switch active"></div>
+</div>
+<button class="w-full mt-4 p-3 text-primary border border-primary rounded-lg cursor-pointer !rounded-button">
+View Privacy Policy
+</button>
+</div>
+`;
+showBottomSheet('Privacy Settings', content);
+});
+
+languageBtn.addEventListener('click', function() {
+const content = `
+<div class="space-y-3">
+<button class="w-full flex items-center justify-between p-3 rounded-lg bg-primary text-white">
+<span>English</span>
+<i class="ri-check-line"></i>
+</button>
+<button class="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
+<span>Spanish</span>
+</button>
+<button class="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
+<span>French</span>
+</button>
+<button class="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
+<span>German</span>
+</button>
+</div>
+`;
+showBottomSheet('Language Settings', content);
+});
+
+helpBtn.addEventListener('click', function() {
+const content = `
+<div class="space-y-3">
+<button class="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
+<i class="ri-question-line text-primary"></i>
+<span>FAQ</span>
+</button>
+<button class="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
+<i class="ri-chat-3-line text-primary"></i>
+<span>Contact Support</span>
+</button>
+<button class="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
+<i class="ri-book-line text-primary"></i>
+<span>User Guide</span>
+</button>
+<button class="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
+<i class="ri-feedback-line text-primary"></i>
+<span>Send Feedback</span>
+</button>
+</div>
+`;
+showBottomSheet('Help & Support', content);
+});
+
+changePasswordBtn.addEventListener('click', function() {
+const content = `
+<div class="space-y-4">
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
+<input type="password" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+<input type="password" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
+<input type="password" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+</div>
+<button class="w-full bg-primary text-white py-3 rounded-lg font-medium cursor-pointer !rounded-button">
+Update Password
+</button>
+</div>
+`;
+showBottomSheet('Change Password', content);
+});
+
+dataExportBtn.addEventListener('click', function() {
+const content = `
+<div class="space-y-4">
+<p class="text-sm text-gray-600 mb-4">Export your account data and work history</p>
+<div class="space-y-3">
+<button class="w-full flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+<span class="text-sm">Work Orders (PDF)</span>
+<i class="ri-download-line text-gray-400"></i>
+</button>
+<button class="w-full flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+<span class="text-sm">Schedule Data (CSV)</span>
+<i class="ri-download-line text-gray-400"></i>
+</button>
+<button class="w-full flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+<span class="text-sm">Complete Archive (ZIP)</span>
+<i class="ri-download-line text-gray-400"></i>
+</button>
+</div>
+</div>
+`;
+showBottomSheet('Export Data', content);
+});
+
+logoutBtn.addEventListener('click', function() {
+const content = `
+<div class="text-center space-y-4">
+<div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+<i class="ri-logout-box-line text-red-600 text-2xl"></i>
+</div>
+<h3 class="text-lg font-semibold text-gray-900">Sign Out</h3>
+<p class="text-sm text-gray-600">Are you sure you want to sign out of your account?</p>
+<div class="flex space-x-3">
+<button class="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg cursor-pointer !rounded-button" onclick="hideBottomSheet()">
+Cancel
+</button>
+<button class="flex-1 py-3 bg-red-600 text-white rounded-lg cursor-pointer !rounded-button">
+Sign Out
+</button>
+</div>
+</div>
+`;
+showBottomSheet('Confirm Sign Out', content);
+});
+});
+</script>
+
+<script id="dynamicToggles">
+document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('click', function(e) {
+if (e.target.classList.contains('toggle-switch') || e.target.closest('.toggle-switch')) {
+const toggle = e.target.classList.contains('toggle-switch') ? e.target : e.target.closest('.toggle-switch');
+toggle.classList.toggle('active');
+}
+});
+});
+</script>
+
+
+<script>
+    (function() {
+      const imgs = Array.from(document.querySelectorAll('img'));
+      Promise.all(imgs.map((img) => new Promise((resolve) => {
+        img.onload = () => {
+          resolve(null);
+        };
+      }))).finally(() => {
+        window.parent.postMessage({
+          type: 'iframeHeight',
+          height: document.body.offsetHeight
+        }, '*');
+      })
+    })()
+  </script><script>
+      (function () {
+  'use strict';
+
+  const originalWindowOpen = window.originalWindowOpen ?? window.open;
+
+  function processAnchor(url) {
+    // 查找锚点，平滑滚动
+    const anchor = document.querySelector(url);
+    if (anchor) {
+      anchor.scrollIntoView({ behavior: 'smooth' });
+    }
+    // 发送 hashchange 事件
+    const event = new Event('hashchange');
+    event.newURL = url;
+    event.oldURL = window.location.href;
+    // 因为预览 iframe 没有 url，所以需要手动设置
+    window.location.hash = url;
+    window.dispatchEvent(event);
+  }
+
+  // 重写 window.open
+  window.open = function (url, target, features) {
+    if (url.startsWith('#')) {
+      // 查找锚点，平滑滚动
+      processAnchor(url);
+      return;
+    }
+    originalWindowOpen(url, '_blank', features);
+    return null;
+  };
+})();
+
+      
+  window.addEventListener('click', (event) => {
+    const target = event.target;
+    const closest = target.closest('a');
+    if (!closest) return;
+    if (closest.tagName === 'A') {
+      event.preventDefault();
+      const href = closest.getAttribute('href');
+      if (!href) return;
+      // check is void link
+      if (['#', 'javascript:void(0)', ''].includes(href)) {
+        return;
+      }
+      // 锚点链接也不处理
+      if (href.startsWith('#')) {
+        return;
+      }
+      window.open(closest.href, '_blank');
+    }
+  });
+
+      
+  document.addEventListener('submit', (event) => {
+    event.preventDefault();
+  }, true);
+
+    </script></body></html>

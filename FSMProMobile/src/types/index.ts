@@ -102,10 +102,89 @@ export interface Job {
   notes?: string;
   created_at: string;
   updated_at: string;
+  // Workshop fields
+  location_type?: 'on_site' | 'workshop';
+  estimated_completion_date?: string;
+  pickup_delivery_fee?: number;
+  delivery_scheduled_date?: string;
+  delivery_technician_id?: string;
   // Joined fields
   customer_name?: string;
   equipment_info?: string;
   technician_name?: string;
+  equipment_intake?: EquipmentIntake;
+  equipment_status?: EquipmentStatus;
+}
+
+// Workshop Types
+export type EquipmentRepairStatus = 
+  | 'pending_intake'
+  | 'in_transit'
+  | 'received'
+  | 'in_repair'
+  | 'repair_completed'
+  | 'ready_for_pickup'
+  | 'out_for_delivery'
+  | 'returned';
+
+export interface EquipmentIntake {
+  id: string;
+  job_id: string;
+  company_id: string;
+  intake_date: string;
+  received_by?: string;
+  reported_issue: string;
+  visual_condition?: string;
+  physical_damage_notes?: string;
+  accessories_included?: string;
+  customer_signature?: string;
+  customer_notes?: string;
+  internal_notes?: string;
+  estimated_repair_time?: number;
+  created_at: string;
+  updated_at: string;
+  photos?: IntakePhoto[];
+}
+
+export interface EquipmentStatus {
+  id: string;
+  job_id: string;
+  company_id: string;
+  current_status: EquipmentRepairStatus;
+  pending_intake_at?: string;
+  in_transit_at?: string;
+  received_at?: string;
+  in_repair_at?: string;
+  repair_completed_at?: string;
+  ready_for_pickup_at?: string;
+  out_for_delivery_at?: string;
+  returned_at?: string;
+  created_at: string;
+  updated_at: string;
+  history?: EquipmentStatusHistory[];
+}
+
+export interface EquipmentStatusHistory {
+  id: string;
+  equipment_status_id: string;
+  job_id: string;
+  from_status?: EquipmentRepairStatus;
+  to_status: EquipmentRepairStatus;
+  changed_at: string;
+  changed_by?: string;
+  notes?: string;
+  created_at: string;
+}
+
+export interface IntakePhoto {
+  id: string;
+  equipment_intake_id: string;
+  photo_url: string;
+  photo_type?: string;
+  caption?: string;
+  taken_at: string;
+  uploaded_by?: string;
+  created_at: string;
 }
 
 // Navigation Types

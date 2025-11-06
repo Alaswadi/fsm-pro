@@ -1,6 +1,7 @@
 export type UserRole = 'super_admin' | 'admin' | 'manager' | 'technician' | 'customer';
 export type JobStatus = 'pending' | 'assigned' | 'in_progress' | 'completed' | 'cancelled' | 'on_hold';
 export type JobPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type LocationType = 'on_site' | 'workshop';
 
 export interface User {
   id: string;
@@ -117,6 +118,11 @@ export interface Job {
   created_by?: string;
   created_at: string;
   updated_at: string;
+  location_type?: LocationType;
+  estimated_completion_date?: string;
+  pickup_delivery_fee?: number;
+  delivery_scheduled_date?: string;
+  delivery_technician_id?: string;
   customer?: Customer;
   technician?: Technician;
   equipment?: {
@@ -131,6 +137,8 @@ export interface Job {
       category?: string;
     };
   };
+  equipment_intake?: any;
+  equipment_status?: any;
 }
 
 export interface EquipmentType {

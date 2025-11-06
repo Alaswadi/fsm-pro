@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'react-hot-toast';
 import { apiService } from '../services/api';
-import { Job, JobOptions, CustomerEquipmentForJob, JobPriority, JobStatus } from '../types';
+import { Job, JobOptions, CustomerEquipmentForJob, JobPriority, JobStatus, LocationType } from '../types';
 import SearchableSelect from './SearchableSelect';
 
 interface WorkOrderModalProps {
@@ -23,6 +23,9 @@ interface FormData {
   scheduled_date: string;
   due_date: string;
   estimated_duration: string;
+  location_type: LocationType;
+  estimated_completion_date: string;
+  pickup_delivery_fee: string;
 }
 
 interface SearchOption {
@@ -51,7 +54,10 @@ const WorkOrderModal: React.FC<WorkOrderModalProps> = ({
     status: 'assigned', // Default to assigned since technician is mandatory
     scheduled_date: '',
     due_date: '',
-    estimated_duration: ''
+    estimated_duration: '',
+    location_type: 'on_site',
+    estimated_completion_date: '',
+    pickup_delivery_fee: ''
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -72,7 +78,11 @@ const WorkOrderModal: React.FC<WorkOrderModalProps> = ({
             new Date(editingJob.scheduled_date).toISOString().slice(0, 16) : '',
           due_date: editingJob.due_date ?
             new Date(editingJob.due_date).toISOString().slice(0, 10) : '',
-          estimated_duration: editingJob.estimated_duration?.toString() || ''
+          estimated_duration: editingJob.estimated_duration?.toString() || '',
+          location_type: editingJob.location_type || 'on_site',
+          estimated_completion_date: editingJob.estimated_completion_date ?
+            new Date(editingJob.estimated_completion_date).toISOString().slice(0, 10) : '',
+          pickup_delivery_fee: editingJob.pickup_delivery_fee?.toString() || ''
         });
       } else {
         resetForm();
@@ -161,7 +171,10 @@ const WorkOrderModal: React.FC<WorkOrderModalProps> = ({
       status: 'assigned',
       scheduled_date: '',
       due_date: '',
-      estimated_duration: ''
+      estimated_duration: '',
+      location_type: 'on_site',
+      estimated_completion_date: '',
+      pickup_delivery_fee: ''
     });
     setErrors({});
   };
@@ -187,9 +200,12 @@ const WorkOrderModal: React.FC<WorkOrderModalProps> = ({
     if (!formData.customer_id) {
       newErrors.customer_id = 'Customer is required';
     }
-    if (!formData.technician_id) {
-      newErrors.technician_id = 'Technician assignment is required';
+    
+    // Technician is only required for on-site jobs
+    if (formData.location_type === 'on_site' && !formData.technician_id) {
+      newErrors.technician_id = 'Technician assignment is required for on-site jobs';
     }
+    
     if (!formData.title.trim()) {
       newErrors.title = 'Title is required';
     }
@@ -209,6 +225,9 @@ const WorkOrderModal: React.FC<WorkOrderModalProps> = ({
     }
     if (formData.estimated_duration && isNaN(Number(formData.estimated_duration))) {
       newErrors.estimated_duration = 'Estimated duration must be a number';
+    }
+    if (formData.pickup_delivery_fee && isNaN(Number(formData.pickup_delivery_fee))) {
+      newErrors.pickup_delivery_fee = 'Pickup/delivery fee must be a number';
     }
 
     setErrors(newErrors);
@@ -231,7 +250,10 @@ const WorkOrderModal: React.FC<WorkOrderModalProps> = ({
         technician_id: formData.technician_id || null,
         scheduled_date: formData.scheduled_date || null,
         due_date: formData.due_date,
-        estimated_duration: formData.estimated_duration ? Number(formData.estimated_duration) : null
+        estimated_duration: formData.estimated_duration ? Number(formData.estimated_duration) : null,
+        location_type: formData.location_type,
+        estimated_completion_date: formData.estimated_completion_date || null,
+        pickup_delivery_fee: formData.pickup_delivery_fee ? Number(formData.pickup_delivery_fee) : null
       };
 
       let response;
@@ -317,10 +339,47 @@ const WorkOrderModal: React.FC<WorkOrderModalProps> = ({
               />
             </div>
 
-            {/* Technician Assignment */}
+            {/* Location Type */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Assign Technician *
+                Location Type *
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, location_type: 'on_site' }))}
+                  className={`px-4 py-3 border-2 rounded-lg font-medium transition-colors ${
+                    formData.location_type === 'on_site'
+                      ? 'border-blue-600 bg-blue-50 text-blue-700'
+                      : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="flex items-center justify-center space-x-2">
+                    <i className="ri-map-pin-line text-lg"></i>
+                    <span>On-Site</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, location_type: 'workshop' }))}
+                  className={`px-4 py-3 border-2 rounded-lg font-medium transition-colors ${
+                    formData.location_type === 'workshop'
+                      ? 'border-blue-600 bg-blue-50 text-blue-700'
+                      : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="flex items-center justify-center space-x-2">
+                    <i className="ri-tools-line text-lg"></i>
+                    <span>Workshop</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Technician Assignment - Only required for on-site jobs */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Assign Technician {formData.location_type === 'on_site' && '*'}
               </label>
               <SearchableSelect
                 value={formData.technician_id}
@@ -328,11 +387,16 @@ const WorkOrderModal: React.FC<WorkOrderModalProps> = ({
                 onSearch={searchTechnicians}
                 placeholder="Search and select a technician..."
                 error={!!errors.technician_id}
-                required
+                required={formData.location_type === 'on_site'}
                 noOptionsMessage="No technicians found"
               />
               {errors.technician_id && (
                 <p className="mt-1 text-sm text-red-600">{errors.technician_id}</p>
+              )}
+              {formData.location_type === 'workshop' && (
+                <p className="mt-1 text-sm text-gray-500">
+                  Technician can be assigned later from the workshop queue
+                </p>
               )}
             </div>
 
@@ -436,41 +500,84 @@ const WorkOrderModal: React.FC<WorkOrderModalProps> = ({
               </div>
             </div>
 
-            {/* Scheduled Date and Duration Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Scheduled Date & Time
-                </label>
-                <input
-                  type="datetime-local"
-                  name="scheduled_date"
-                  value={formData.scheduled_date}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+            {/* Conditional Fields based on Location Type */}
+            {formData.location_type === 'on_site' ? (
+              // On-Site Fields
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Scheduled Date & Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    name="scheduled_date"
+                    value={formData.scheduled_date}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Estimated Duration (minutes)
-                </label>
-                <input
-                  type="number"
-                  name="estimated_duration"
-                  value={formData.estimated_duration}
-                  onChange={handleInputChange}
-                  placeholder="e.g., 120"
-                  min="0"
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.estimated_duration ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {errors.estimated_duration && (
-                  <p className="mt-1 text-sm text-red-600">{errors.estimated_duration}</p>
-                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Estimated Duration (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    name="estimated_duration"
+                    value={formData.estimated_duration}
+                    onChange={handleInputChange}
+                    placeholder="e.g., 120"
+                    min="0"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.estimated_duration ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  />
+                  {errors.estimated_duration && (
+                    <p className="mt-1 text-sm text-red-600">{errors.estimated_duration}</p>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              // Workshop Fields
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Estimated Completion Date
+                  </label>
+                  <input
+                    type="date"
+                    name="estimated_completion_date"
+                    value={formData.estimated_completion_date}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    Expected date when repair will be completed
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Pickup/Delivery Fee ($)
+                  </label>
+                  <input
+                    type="number"
+                    name="pickup_delivery_fee"
+                    value={formData.pickup_delivery_fee}
+                    onChange={handleInputChange}
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.pickup_delivery_fee ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  />
+                  {errors.pickup_delivery_fee && (
+                    <p className="mt-1 text-sm text-red-600">{errors.pickup_delivery_fee}</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Form Actions */}
             <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">

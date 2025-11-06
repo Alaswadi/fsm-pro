@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { apiService } from '../services/api';
+import type { WorkshopSettings } from '../types/workshop';
 
 interface Company {
   id: string;
@@ -50,13 +51,16 @@ interface MailSettings {
   is_enabled: boolean;
 }
 
+
+
 interface SettingsState {
-  activeTab: 'company' | 'skills' | 'certifications' | 'mail';
+  activeTab: 'company' | 'skills' | 'certifications' | 'mail' | 'workshop';
   loading: boolean;
   company: Company | null;
   skills: Skill[];
   certifications: Certification[];
   mailSettings: MailSettings | null;
+  workshopSettings: WorkshopSettings | null;
   showSkillModal: boolean;
   showCertModal: boolean;
   editingSkill: Skill | null;
@@ -71,6 +75,7 @@ const Settings: React.FC = () => {
     skills: [],
     certifications: [],
     mailSettings: null,
+    workshopSettings: null,
     showSkillModal: false,
     showCertModal: false,
     editingSkill: null,
@@ -107,6 +112,18 @@ const Settings: React.FC = () => {
 
   const [testEmail, setTestEmail] = useState('');
 
+  const [workshopForm, setWorkshopForm] = useState<Partial<WorkshopSettings>>({
+    max_concurrent_jobs: 20,
+    max_jobs_per_technician: 5,
+    default_estimated_repair_hours: 24,
+    default_pickup_delivery_fee: 0,
+    workshop_address: '',
+    workshop_phone: '',
+    send_intake_confirmation: true,
+    send_ready_notification: true,
+    send_status_updates: true,
+  });
+
   useEffect(() => {
     loadData();
   }, [state.activeTab]);
@@ -136,6 +153,12 @@ const Settings: React.FC = () => {
         if (response.success && response.data) {
           setState(prev => ({ ...prev, mailSettings: response.data }));
           setMailForm(response.data);
+        }
+      } else if (state.activeTab === 'workshop') {
+        const response = await apiService.get<WorkshopSettings>('/workshop/settings');
+        if (response.success && response.data) {
+          setState(prev => ({ ...prev, workshopSettings: response.data || null }));
+          setWorkshopForm(response.data);
         }
       }
     } catch (error: any) {
@@ -331,6 +354,47 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleWorkshopSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate workshop settings
+    const errors: string[] = [];
+    
+    if (workshopForm.max_concurrent_jobs && (workshopForm.max_concurrent_jobs < 1 || workshopForm.max_concurrent_jobs > 1000)) {
+      errors.push('Max concurrent jobs must be between 1 and 1000');
+    }
+    
+    if (workshopForm.max_jobs_per_technician && (workshopForm.max_jobs_per_technician < 1 || workshopForm.max_jobs_per_technician > 100)) {
+      errors.push('Max jobs per technician must be between 1 and 100');
+    }
+    
+    if (workshopForm.default_estimated_repair_hours && (workshopForm.default_estimated_repair_hours < 1 || workshopForm.default_estimated_repair_hours > 1000)) {
+      errors.push('Default estimated repair hours must be between 1 and 1000');
+    }
+    
+    if (workshopForm.default_pickup_delivery_fee !== undefined && workshopForm.default_pickup_delivery_fee < 0) {
+      errors.push('Default pickup/delivery fee cannot be negative');
+    }
+    
+    if (errors.length > 0) {
+      toast.error(errors[0]);
+      return;
+    }
+    
+    try {
+      const response = await apiService.put<WorkshopSettings>('/workshop/settings', workshopForm);
+      if (response.success) {
+        toast.success('Workshop settings updated successfully');
+        setState(prev => ({ ...prev, workshopSettings: response.data || null }));
+      } else {
+        throw new Error(response.error || 'Failed to update workshop settings');
+      }
+    } catch (error: any) {
+      console.error('Error updating workshop settings:', error);
+      toast.error(error.response?.data?.error || 'Failed to update workshop settings');
+    }
+  };
+
   if (state.loading) {
     return (
       <div className="p-6">
@@ -352,17 +416,18 @@ const Settings: React.FC = () => {
       {/* Tab Navigation */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
         <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6">
+          <nav className="flex flex-wrap gap-4 px-6">
             {[
               { id: 'company', label: 'Company Profile', icon: 'ri-building-line' },
               { id: 'skills', label: 'Skills Management', icon: 'ri-tools-line' },
               { id: 'certifications', label: 'Certifications', icon: 'ri-award-line' },
               { id: 'mail', label: 'Mail Settings', icon: 'ri-mail-settings-line' },
+              { id: 'workshop', label: 'Workshop Settings', icon: 'ri-settings-3-line' },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setState(prev => ({ ...prev, activeTab: tab.id as any }))}
-                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 whitespace-nowrap ${
                   state.activeTab === tab.id
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -749,6 +814,172 @@ const Settings: React.FC = () => {
                   className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
                 >
                   Save Mail Settings
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {state.activeTab === 'workshop' && (
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-gray-900">Workshop Settings</h2>
+            </div>
+
+            <form onSubmit={handleWorkshopSubmit} className="space-y-6">
+              {/* Capacity Settings */}
+              <div>
+                <h3 className="text-md font-medium text-gray-900 mb-4">Capacity Management</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Max Concurrent Jobs *</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={workshopForm.max_concurrent_jobs || ''}
+                      onChange={(e) => setWorkshopForm(prev => ({ ...prev, max_concurrent_jobs: parseInt(e.target.value) }))}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Maximum number of jobs the workshop can handle at once</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Max Jobs Per Technician *</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={workshopForm.max_jobs_per_technician || ''}
+                      onChange={(e) => setWorkshopForm(prev => ({ ...prev, max_jobs_per_technician: parseInt(e.target.value) }))}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Maximum jobs each technician can work on simultaneously</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Default Settings */}
+              <div>
+                <h3 className="text-md font-medium text-gray-900 mb-4">Default Values</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Default Estimated Repair Hours *</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={workshopForm.default_estimated_repair_hours || ''}
+                      onChange={(e) => setWorkshopForm(prev => ({ ...prev, default_estimated_repair_hours: parseInt(e.target.value) }))}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Default time estimate for repairs (in hours)</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Default Pickup/Delivery Fee</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={workshopForm.default_pickup_delivery_fee || ''}
+                      onChange={(e) => setWorkshopForm(prev => ({ ...prev, default_pickup_delivery_fee: parseFloat(e.target.value) }))}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Default fee for equipment pickup/delivery</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Workshop Location */}
+              <div>
+                <h3 className="text-md font-medium text-gray-900 mb-4">Workshop Location</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Workshop Address</label>
+                    <textarea
+                      rows={3}
+                      value={workshopForm.workshop_address || ''}
+                      onChange={(e) => setWorkshopForm(prev => ({ ...prev, workshop_address: e.target.value }))}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Enter workshop address"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Workshop Phone</label>
+                    <input
+                      type="tel"
+                      value={workshopForm.workshop_phone || ''}
+                      onChange={(e) => setWorkshopForm(prev => ({ ...prev, workshop_phone: e.target.value }))}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Workshop contact number"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Notification Settings */}
+              <div>
+                <h3 className="text-md font-medium text-gray-900 mb-4">Notification Preferences</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900">Send Intake Confirmation</h4>
+                      <p className="text-sm text-gray-500">Notify customers when equipment is received</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={workshopForm.send_intake_confirmation || false}
+                        onChange={(e) => setWorkshopForm(prev => ({ ...prev, send_intake_confirmation: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900">Send Ready Notification</h4>
+                      <p className="text-sm text-gray-500">Notify customers when equipment is ready for pickup</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={workshopForm.send_ready_notification || false}
+                        onChange={(e) => setWorkshopForm(prev => ({ ...prev, send_ready_notification: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900">Send Status Updates</h4>
+                      <p className="text-sm text-gray-500">Notify customers of repair progress updates</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={workshopForm.send_status_updates || false}
+                        onChange={(e) => setWorkshopForm(prev => ({ ...prev, send_status_updates: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Save Button */}
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Save Workshop Settings
                 </button>
               </div>
             </form>

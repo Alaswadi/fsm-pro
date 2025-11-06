@@ -3,25 +3,37 @@ import {
   View,
   Text,
   FlatList,
-  TouchableOpacity,
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
   Alert,
+  ScrollView,
+  TouchableOpacity,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Job } from '../../src/types';
 import { apiService } from '../../src/services/api';
 import { useAuth } from '../../src/context/AuthContext';
+import { Theme, getStatusColor } from '@/constants/Theme';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { FilterChip } from '@/components/ui/FilterChip';
+import { SearchBar } from '@/components/ui/SearchBar';
+import { ThemedText } from '@/components/ThemedText';
+import { AppHeader } from '@/components/ui/AppHeader';
+import { AppFooter } from '@/components/ui/AppFooter';
 
 export default function WorkOrdersScreen() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'scheduled' | 'in_progress' | 'completed'>('all');
+  const [filter, setFilter] = useState<'all' | 'scheduled' | 'in_progress' | 'completed' | 'urgent'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadJobs();
@@ -30,7 +42,10 @@ export default function WorkOrdersScreen() {
   const loadJobs = async () => {
     try {
       setIsLoading(true);
-      const params = filter !== 'all' ? { status: filter } : {};
+      const params: any = {};
+      if (filter !== 'all') {
+        params.status = filter;
+      }
       const response = await apiService.getJobs(params);
 
       if (response.success && response.data) {
@@ -51,130 +66,177 @@ export default function WorkOrdersScreen() {
     setIsRefreshing(false);
   };
 
-  const getStatusColor = (status: Job['status']) => {
+  const getStatusLabel = (status: Job['status']) => {
     switch (status) {
-      case 'scheduled': return '#3B82F6';
-      case 'in_progress': return '#F59E0B';
-      case 'completed': return '#10B981';
-      case 'cancelled': return '#EF4444';
-      default: return '#6B7280';
+      case 'scheduled': return 'Scheduled';
+      case 'in_progress': return 'In Progress';
+      case 'completed': return 'Completed';
+      case 'cancelled': return 'Cancelled';
+      default: return 'Pending';
     }
   };
 
-  const getPriorityColor = (priority: Job['priority']) => {
-    switch (priority) {
-      case 'urgent': return '#EF4444';
-      case 'high': return '#F59E0B';
-      case 'medium': return '#3B82F6';
-      case 'low': return '#10B981';
-      default: return '#6B7280';
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = date.getTime() - now.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    // Past dates
+    if (diffMs < 0) {
+      const absDiffHours = Math.abs(diffHours);
+      if (absDiffHours < 1) {
+        return 'Just now';
+      } else if (absDiffHours < 24) {
+        return `${absDiffHours} hour${absDiffHours > 1 ? 's' : ''} ago`;
+      } else if (absDiffHours < 48) {
+        return 'Yesterday';
+      } else {
+        return date.toLocaleDateString();
+      }
+    }
+
+    // Future dates
+    if (diffDays === 0) {
+      return `Today ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+    } else if (diffDays === 1) {
+      return `Tomorrow ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+    } else if (diffDays < 7) {
+      return `${date.toLocaleDateString('en-US', { weekday: 'long' })} ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+    } else {
+      return date.toLocaleDateString();
     }
   };
+
+  const filteredJobs = jobs.filter(job => {
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        job.title.toLowerCase().includes(query) ||
+        job.description.toLowerCase().includes(query) ||
+        job.customer_name?.toLowerCase().includes(query)
+      );
+    }
+    return true;
+  });
 
   const renderJobItem = ({ item }: { item: Job }) => (
-    <TouchableOpacity
-      style={styles.jobCard}
+    <Card
       onPress={() => router.push(`/work-order-details?id=${item.id}`)}
+      style={styles.jobCard}
     >
       <View style={styles.jobHeader}>
-        <Text style={styles.jobTitle} numberOfLines={2}>{item.title}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{item.status.replace('_', ' ').toUpperCase()}</Text>
-        </View>
+        <ThemedText type="subheading" style={styles.jobTitle}>
+          {item.title}
+        </ThemedText>
+        <Badge label={getStatusLabel(item.status)} status={getStatusLabel(item.status) as any} />
       </View>
 
-      <Text style={styles.jobDescription} numberOfLines={2}>{item.description}</Text>
+      <ThemedText type="body" style={styles.customerName}>
+        {item.customer_name}
+      </ThemedText>
 
-      <View style={styles.jobDetails}>
-        <View style={styles.detailRow}>
-          <Ionicons name="business-outline" size={16} color="#6B7280" />
-          <Text style={styles.detailText}>{item.customer_name || 'No customer'}</Text>
-        </View>
-
-        <View style={styles.detailRow}>
-          <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-          <Text style={styles.detailText}>
-            {new Date(item.scheduled_date).toLocaleDateString()}
-          </Text>
-        </View>
-
-        <View style={styles.detailRow}>
-          <View style={[styles.priorityDot, { backgroundColor: getPriorityColor(item.priority) }]} />
-          <Text style={styles.detailText}>{item.priority.toUpperCase()} Priority</Text>
-        </View>
+      <View style={styles.jobFooter}>
+        <ThemedText type="caption" style={styles.jobId}>
+          {item.work_order_number || `WO-${item.id.substring(0, 8)}`}
+        </ThemedText>
+        <ThemedText type="caption" style={styles.jobTime}>
+          {formatDate(item.scheduled_date)}
+        </ThemedText>
       </View>
-    </TouchableOpacity>
-  );
-
-  const renderFilterButton = (filterValue: typeof filter, label: string) => (
-    <TouchableOpacity
-      style={[
-        styles.filterButton,
-        filter === filterValue && styles.filterButtonActive
-      ]}
-      onPress={() => setFilter(filterValue)}
-    >
-      <Text style={[
-        styles.filterButtonText,
-        filter === filterValue && styles.filterButtonTextActive
-      ]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
+    </Card>
   );
 
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#ea2a33" />
-        <Text style={styles.loadingText}>Loading work orders...</Text>
+        <ActivityIndicator size="large" color={Theme.colors.primary.DEFAULT} />
+        <ThemedText type="body" style={styles.loadingText}>Loading work orders...</ThemedText>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Work Orders</Text>
-        <Text style={styles.headerSubtitle}>
-          Welcome back, {user?.full_name?.split(' ')[0] || 'Technician'}
-        </Text>
+      {/* Header */}
+      <AppHeader title="Work Orders" />
+
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <SearchBar
+          placeholder="Search work orders..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
       </View>
 
-      <View style={styles.filterContainer}>
-        {renderFilterButton('all', 'All')}
-        {renderFilterButton('scheduled', 'Scheduled')}
-        {renderFilterButton('in_progress', 'In Progress')}
-        {renderFilterButton('completed', 'Completed')}
+      {/* Filter Chips */}
+      <View style={styles.filterWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterContainer}
+        >
+          <FilterChip
+            label="All Orders"
+            active={filter === 'all'}
+            onPress={() => setFilter('all')}
+            style={styles.filterChip}
+          />
+          <FilterChip
+            label="In Progress"
+            active={filter === 'in_progress'}
+            onPress={() => setFilter('in_progress')}
+            style={styles.filterChip}
+          />
+          <FilterChip
+            label="Completed"
+            active={filter === 'completed'}
+            onPress={() => setFilter('completed')}
+            style={styles.filterChip}
+          />
+          <FilterChip
+            label="Urgent"
+            active={filter === 'urgent'}
+            onPress={() => setFilter('urgent')}
+            style={styles.filterChip}
+          />
+        </ScrollView>
       </View>
 
+      {/* Work Orders List */}
       <FlatList
-        data={jobs}
+        data={filteredJobs}
         renderItem={renderJobItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={[styles.listContainer, { paddingBottom: insets.bottom + 100 }]}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={onRefresh}
-            colors={['#ea2a33']}
+            colors={[Theme.colors.primary.DEFAULT]}
+            tintColor={Theme.colors.primary.DEFAULT}
           />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="clipboard-outline" size={64} color="#D1D5DB" />
-            <Text style={styles.emptyText}>No work orders found</Text>
-            <Text style={styles.emptySubtext}>
-              {filter === 'all'
+            <Ionicons name="clipboard-outline" size={64} color={Theme.colors.gray[300]} />
+            <ThemedText type="subheading" style={styles.emptyText}>No work orders found</ThemedText>
+            <ThemedText type="body" style={styles.emptySubtext}>
+              {searchQuery
+                ? 'Try adjusting your search'
+                : filter === 'all'
                 ? 'You have no work orders assigned yet'
                 : `No ${filter.replace('_', ' ')} work orders found`
               }
-            </Text>
+            </ThemedText>
           </View>
         }
       />
 
-
+      {/* Footer */}
+      <AppFooter />
     </View>
   );
 }
@@ -182,125 +244,99 @@ export default function WorkOrdersScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Theme.colors.background.primary,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Theme.colors.background.primary,
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6B7280',
+    marginTop: Theme.spacing.lg,
   },
   header: {
-    backgroundColor: 'white',
-    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Theme.colors.white,
+    paddingHorizontal: Theme.spacing.lg,
     paddingTop: 60,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingBottom: Theme.spacing.md,
+    ...Theme.shadows.sm,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.md,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.md,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
+    fontSize: Theme.typography.fontSizes.lg,
   },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#6B7280',
+  iconButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchContainer: {
+    backgroundColor: Theme.colors.white,
+    paddingHorizontal: Theme.spacing.lg,
+    paddingVertical: Theme.spacing.md,
+  },
+  filterWrapper: {
+    backgroundColor: Theme.colors.white,
+    paddingVertical: Theme.spacing.md,
   },
   filterContainer: {
+    paddingHorizontal: Theme.spacing.lg,
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    alignItems: 'center',
   },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 12,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-  },
-  filterButtonActive: {
-    backgroundColor: '#ea2a33',
-  },
-  filterButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  filterButtonTextActive: {
-    color: 'white',
+  filterChip: {
+    marginRight: Theme.spacing.sm,
   },
   listContainer: {
-    padding: 20,
+    padding: Theme.spacing.lg,
   },
   jobCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    marginBottom: Theme.spacing.md,
   },
   jobHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: Theme.spacing.sm,
   },
   jobTitle: {
     flex: 1,
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginRight: 12,
+    marginRight: Theme.spacing.md,
+    fontSize: Theme.typography.fontSizes.base,
+    fontWeight: Theme.typography.fontWeights.semibold,
+    color: Theme.colors.text.primary,
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+  customerName: {
+    fontSize: Theme.typography.fontSizes.sm,
+    color: Theme.colors.text.secondary,
+    marginBottom: Theme.spacing.sm,
   },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'white',
-  },
-  jobDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 16,
-    lineHeight: 20,
-  },
-  jobDetails: {
-    gap: 8,
-  },
-  detailRow: {
+  jobFooter: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  detailText: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginLeft: 8,
+  jobId: {
+    fontSize: Theme.typography.fontSizes.xs,
+    color: Theme.colors.text.tertiary,
   },
-  priorityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  jobTime: {
+    fontSize: Theme.typography.fontSizes.xs,
+    color: Theme.colors.text.tertiary,
   },
   emptyContainer: {
     flex: 1,
@@ -309,17 +345,11 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: Theme.spacing.lg,
+    marginBottom: Theme.spacing.sm,
   },
   emptySubtext: {
-    fontSize: 14,
-    color: '#6B7280',
     textAlign: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: Theme.spacing['3xl'],
   },
-
 });

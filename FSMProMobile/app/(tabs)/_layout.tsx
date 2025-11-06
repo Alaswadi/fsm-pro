@@ -1,43 +1,69 @@
 import { Tabs, Redirect } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/HapticTab';
-import TabBarBackground from '@/components/ui/TabBarBackground';
+import { TabIcon } from '@/components/ui/TabIcon';
 import { useAuth } from '../../src/context/AuthContext';
+import { Theme } from '@/constants/Theme';
 
 export default function TabLayout() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   // Redirect to login if not authenticated
   if (!isLoading && !isAuthenticated) {
     return <Redirect href="/login" />;
   }
 
+  const isCustomer = user?.role === 'customer';
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#ea2a33',
-        tabBarInactiveTintColor: '#6B7280',
+        tabBarActiveTintColor: Theme.colors.primary.DEFAULT,
+        tabBarInactiveTintColor: Theme.colors.gray[400],
         headerShown: false,
         tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
         tabBarStyle: {
-          backgroundColor: 'white',
-          borderTopWidth: 1,
-          borderTopColor: '#E5E7EB',
-          height: Platform.OS === 'ios' ? 90 : 70,
-          paddingBottom: Platform.OS === 'ios' ? 25 : 10,
-          paddingTop: 10,
+          display: 'none',
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '500',
+          marginTop: 4,
+        },
+        tabBarIconStyle: {
+          marginTop: 4,
         },
       }}>
       <Tabs.Screen
+        name="customer-dashboard"
+        options={{
+          title: 'My Equipment',
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="inventory" color={color} focused={focused} />
+          ),
+          href: isCustomer ? undefined : null,
+        }}
+      />
+      <Tabs.Screen
         name="index"
         options={{
-          title: 'Work Orders',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="list-outline" size={size || 24} color={color} />
+          title: 'Orders',
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="orders" color={color} focused={focused} />
+          ),
+          href: !isCustomer ? undefined : null,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="profile" color={color} focused={focused} />
           ),
         }}
       />
@@ -45,27 +71,30 @@ export default function TabLayout() {
         name="schedule"
         options={{
           title: 'Schedule',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar-outline" size={size || 24} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="schedule" color={color} focused={focused} />
           ),
+          href: !isCustomer ? undefined : null,
+        }}
+      />
+      <Tabs.Screen
+        name="tracking"
+        options={{
+          title: 'Tracking',
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="tracking" color={color} focused={focused} />
+          ),
+          href: !isCustomer ? undefined : null,
         }}
       />
       <Tabs.Screen
         name="inventory"
         options={{
           title: 'Inventory',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="cube-outline" size={size || 24} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="inventory" color={color} focused={focused} />
           ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size || 24} color={color} />
-          ),
+          href: !isCustomer ? undefined : null,
         }}
       />
     </Tabs>

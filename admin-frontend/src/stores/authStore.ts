@@ -32,20 +32,27 @@ export const useAuthStore = create<AuthStore>()(
           });
 
           const response = await apiService.login(credentials);
-          
+
           if (response.success && response.data) {
             const { user, token } = response.data;
-            
+
+            // Validate that only admin users can access the admin dashboard
+            if (user.role === 'technician' || user.role === 'customer') {
+              set({ isLoading: false });
+              toast.error('This dashboard is for administrators only. Please use the mobile app.');
+              return false;
+            }
+
             // Store token in localStorage
             localStorage.setItem('fsm_token', token);
-            
+
             set({
               user,
               token,
               isAuthenticated: true,
               isLoading: false,
             });
-            
+
             toast.success('Login successful!');
             return true;
           } else {
@@ -87,6 +94,19 @@ export const useAuthStore = create<AuthStore>()(
           const response = await apiService.getProfile();
 
           if (response.success && response.data) {
+            // Validate that only admin users can access the admin dashboard
+            if (response.data.role === 'technician' || response.data.role === 'customer') {
+              localStorage.removeItem('fsm_token');
+              set({
+                user: null,
+                token: null,
+                isAuthenticated: false,
+                isLoading: false,
+              });
+              toast.error('This dashboard is for administrators only. Please use the mobile app.');
+              return;
+            }
+
             set({
               user: response.data,
               token,
