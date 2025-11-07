@@ -210,7 +210,10 @@ const WorkshopSettings: React.FC = () => {
                 type="number"
                 min="1"
                 value={state.formData.max_concurrent_jobs}
-                onChange={(e) => handleInputChange('max_concurrent_jobs', parseInt(e.target.value) || 0)}
+                onChange={(e) => {
+                  const value = e.target.value === '' ? 1 : parseInt(e.target.value);
+                  handleInputChange('max_concurrent_jobs', isNaN(value) ? 1 : value);
+                }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <p className="text-xs text-gray-500 mt-1">Maximum number of jobs the workshop can handle at once</p>
@@ -224,7 +227,10 @@ const WorkshopSettings: React.FC = () => {
                 type="number"
                 min="1"
                 value={state.formData.max_jobs_per_technician}
-                onChange={(e) => handleInputChange('max_jobs_per_technician', parseInt(e.target.value) || 0)}
+                onChange={(e) => {
+                  const value = e.target.value === '' ? 1 : parseInt(e.target.value);
+                  handleInputChange('max_jobs_per_technician', isNaN(value) ? 1 : value);
+                }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <p className="text-xs text-gray-500 mt-1">Maximum number of jobs each technician can work on</p>
@@ -238,7 +244,10 @@ const WorkshopSettings: React.FC = () => {
                 type="number"
                 min="1"
                 value={state.formData.default_estimated_repair_hours}
-                onChange={(e) => handleInputChange('default_estimated_repair_hours', parseInt(e.target.value) || 0)}
+                onChange={(e) => {
+                  const value = e.target.value === '' ? 1 : parseInt(e.target.value);
+                  handleInputChange('default_estimated_repair_hours', isNaN(value) ? 1 : value);
+                }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <p className="text-xs text-gray-500 mt-1">Default time estimate for repairs (in hours)</p>
@@ -253,7 +262,10 @@ const WorkshopSettings: React.FC = () => {
                 min="0"
                 step="0.01"
                 value={state.formData.default_pickup_delivery_fee}
-                onChange={(e) => handleInputChange('default_pickup_delivery_fee', parseFloat(e.target.value) || 0)}
+                onChange={(e) => {
+                  const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                  handleInputChange('default_pickup_delivery_fee', isNaN(value) ? 0 : value);
+                }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <p className="text-xs text-gray-500 mt-1">Default fee for equipment pickup or delivery</p>

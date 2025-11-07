@@ -386,7 +386,7 @@ const WorkOrders: React.FC = () => {
     });
   };
 
-  const formatDueDate = (dateString?: string) => {
+  const formatDueDate = (dateString?: string, status?: JobStatus) => {
     if (!dateString) return <span className="text-gray-500">No due date</span>;
 
     const dueDate = new Date(dateString);
@@ -399,6 +399,11 @@ const WorkOrders: React.FC = () => {
       month: 'short',
       day: 'numeric'
     });
+
+    // Don't show overdue status for completed or cancelled jobs
+    if (status === 'completed' || status === 'cancelled') {
+      return <span className="text-gray-700">{formattedDate}</span>;
+    }
 
     // Check if overdue
     if (dueDate < today) {
@@ -735,7 +740,7 @@ const WorkOrders: React.FC = () => {
                           {formatDate(job.scheduled_date)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {formatDueDate(job.due_date)}
+                          {formatDueDate(job.due_date, job.status)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end space-x-2">

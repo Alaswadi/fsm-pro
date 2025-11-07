@@ -15,6 +15,7 @@ import Technicians from './pages/Technicians';
 import Customers from './pages/Customers';
 import Equipment from './pages/Equipment';
 import Inventory from './pages/Inventory';
+import InventoryOrders from './pages/InventoryOrders';
 import Settings from './pages/Settings';
 import WorkOrders from './pages/WorkOrders';
 import WorkshopQueue from './pages/WorkshopQueue';
@@ -73,9 +74,10 @@ const App: React.FC = () => {
               <Route path="equipment" element={<Equipment />} />
 
               <Route path="inventory" element={<Inventory />} />
-              
-              <Route 
-                path="analytics" 
+              <Route path="inventory-orders" element={<InventoryOrders />} />
+
+              <Route
+                path="analytics"
                 element={
                   <div className="p-6">
                     <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 text-center">

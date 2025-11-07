@@ -284,6 +284,32 @@ class ApiService {
   async testMailSettings(testEmail: string): Promise<ApiResponse<any>> {
     return this.post('/settings/mail/test', { test_email: testEmail });
   }
+
+  // Inventory specific methods
+  async getInventoryOrders(params?: any): Promise<ApiResponse<any>> {
+    return this.get('/inventory/orders', params);
+  }
+
+  async getInventoryItems(params?: any): Promise<ApiResponse<any>> {
+    return this.get('/inventory', params);
+  }
+
+  async getLowStockAlerts(): Promise<ApiResponse<any>> {
+    return this.get('/inventory/alerts');
+  }
+
+  async updateInventoryOrderStatus(orderId: string, status: string, notes?: string): Promise<ApiResponse<any>> {
+    return this.patch(`/inventory/orders/${orderId}/status`, { status, notes });
+  }
+
+  async exportInventoryOrdersPDF(params?: any): Promise<Blob> {
+    const response = await this.api.get('/inventory/orders/export/pdf', {
+      params,
+      responseType: 'blob',
+    });
+
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

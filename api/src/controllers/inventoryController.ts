@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { query } from '../config/database';
 import { ApiResponse, Part, AuthRequest } from '../types';
+import PDFDocument from 'pdfkit';
 
 // Get all inventory items with pagination and filtering
 export const getInventoryItems = async (req: Request, res: Response) => {
@@ -155,7 +156,7 @@ export const getWorkOrderInventoryOrders = async (req: Request, res: Response) =
 
     // Get all ordered equipment for the work order with part details
     const ordersQuery = `
-      SELECT 
+      SELECT
         wo.id,
         wo.work_order_id,
         wo.quantity,
@@ -783,7 +784,7 @@ export const processInventoryOrder = async (req: AuthRequest, res: Response) => 
       }
 
       const inventoryItem = itemResult.rows[0];
-      
+
       if (inventoryItem.current_stock < item.quantity) {
         validationErrors.push(`Insufficient stock for ${inventoryItem.name}. Available: ${inventoryItem.current_stock}, Requested: ${item.quantity}`);
         continue;
@@ -807,10 +808,10 @@ export const processInventoryOrder = async (req: AuthRequest, res: Response) => 
 
     // Process the order - update stock levels and create order records
     const orderResults = [];
-    
+
     for (const item of itemsToProcess) {
       const newStock = item.current_stock - item.quantity;
-      
+
       // Update stock level
       const updateResult = await query(
         'UPDATE parts SET current_stock = $1, updated_at = NOW() WHERE id = $2 AND company_id = $3 RETURNING *',
@@ -820,8 +821,8 @@ export const processInventoryOrder = async (req: AuthRequest, res: Response) => 
       if (updateResult.rows.length > 0) {
         // Create order record in work_order_inventory_orders table
         await query(
-          `INSERT INTO work_order_inventory_orders 
-           (work_order_id, part_id, quantity, unit_price, ordered_by, status, notes) 
+          `INSERT INTO work_order_inventory_orders
+           (work_order_id, part_id, quantity, unit_price, ordered_by, status, notes)
            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [
             work_order_id,
@@ -867,4 +868,518 @@ export const processInventoryOrder = async (req: AuthRequest, res: Response) => 
   }
 };
 
+// Get all inventory orders audit report with filtering
+export const getAllInventoryOrders = async (req: AuthRequest, res: Response) => {
+  try {
+    const {
+      page = 1,
+      limit = 50,
+      date_from,
+      date_to,
+      technician_id,
+      part_id,
+      work_order_id,
+      status,
+      search
+    } = req.query;
 
+    const offset = (Number(page) - 1) * Number(limit);
+    const companyId = req.company?.id;
+
+    if (!companyId) {
+      return res.status(403).json({
+        success: false,
+        error: 'No company context found'
+      } as ApiResponse);
+    }
+
+    let whereConditions = ['p.company_id = $1'];
+    let queryParams: any[] = [companyId];
+    let paramIndex = 2;
+
+    // Add date range filter
+    if (date_from) {
+      whereConditions.push(`wo.ordered_at >= $${paramIndex}`);
+      queryParams.push(date_from);
+      paramIndex++;
+    }
+
+    if (date_to) {
+      whereConditions.push(`wo.ordered_at <= $${paramIndex}`);
+      queryParams.push(date_to);
+      paramIndex++;
+    }
+
+    // Add technician filter
+    if (technician_id) {
+      whereConditions.push(`wo.ordered_by = $${paramIndex}`);
+      queryParams.push(technician_id);
+      paramIndex++;
+    }
+
+    // Add part filter
+    if (part_id) {
+      whereConditions.push(`wo.part_id = $${paramIndex}`);
+      queryParams.push(part_id);
+      paramIndex++;
+    }
+
+    // Add work order filter
+    if (work_order_id) {
+      whereConditions.push(`wo.work_order_id = $${paramIndex}`);
+      queryParams.push(work_order_id);
+      paramIndex++;
+    }
+
+    // Add status filter
+    if (status) {
+      whereConditions.push(`wo.status = $${paramIndex}`);
+      queryParams.push(status);
+      paramIndex++;
+    }
+
+    // Add search filter (search by part name, part number, technician name, or work order ID)
+    if (search) {
+      whereConditions.push(`(
+        p.name ILIKE $${paramIndex} OR
+        p.part_number ILIKE $${paramIndex} OR
+        u.full_name ILIKE $${paramIndex} OR
+        j.job_number ILIKE $${paramIndex}
+      )`);
+      queryParams.push(`%${search}%`);
+      paramIndex++;
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    // Get total count
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM work_order_inventory_orders wo
+      LEFT JOIN parts p ON wo.part_id = p.id
+      LEFT JOIN users u ON wo.ordered_by = u.id
+      LEFT JOIN jobs j ON wo.work_order_id = j.id
+      WHERE ${whereClause}
+    `;
+
+    const countResult = await query(countQuery, queryParams);
+    const total = parseInt(countResult.rows[0].total);
+
+    // Get paginated orders
+    const ordersQuery = `
+      SELECT
+        wo.id,
+        wo.work_order_id,
+        wo.quantity,
+        wo.unit_price,
+        wo.total_price,
+        wo.ordered_at,
+        wo.status,
+        wo.notes,
+        p.id as part_id,
+        p.part_number,
+        p.name as part_name,
+        p.description as part_description,
+        p.category,
+        p.unit_price as current_unit_price,
+        p.current_stock,
+        u.id as ordered_by_id,
+        u.full_name as ordered_by_name,
+        u.email as ordered_by_email,
+        u.role as ordered_by_role,
+        j.job_number,
+        j.title as work_order_title,
+        j.status as work_order_status,
+        c.company_name as customer_name
+      FROM work_order_inventory_orders wo
+      LEFT JOIN parts p ON wo.part_id = p.id
+      LEFT JOIN users u ON wo.ordered_by = u.id
+      LEFT JOIN jobs j ON wo.work_order_id = j.id
+      LEFT JOIN customers c ON j.customer_id = c.id
+      WHERE ${whereClause}
+      ORDER BY wo.ordered_at DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+
+    queryParams.push(limit, offset);
+    const ordersResult = await query(ordersQuery, queryParams);
+
+    // Calculate summary statistics
+    const summaryQuery = `
+      SELECT
+        COUNT(*) as total_orders,
+        SUM(wo.quantity) as total_items,
+        SUM(wo.total_price) as total_value,
+        COUNT(DISTINCT wo.ordered_by) as unique_technicians,
+        COUNT(DISTINCT wo.part_id) as unique_parts,
+        COUNT(DISTINCT wo.work_order_id) as unique_work_orders
+      FROM work_order_inventory_orders wo
+      LEFT JOIN parts p ON wo.part_id = p.id
+      WHERE ${whereClause}
+    `;
+
+    const summaryResult = await query(summaryQuery, queryParams.slice(0, -2)); // Remove limit and offset
+    const summary = {
+      total_orders: parseInt(summaryResult.rows[0].total_orders) || 0,
+      total_items: parseInt(summaryResult.rows[0].total_items) || 0,
+      total_value: parseFloat(summaryResult.rows[0].total_value) || 0,
+      unique_technicians: parseInt(summaryResult.rows[0].unique_technicians) || 0,
+      unique_parts: parseInt(summaryResult.rows[0].unique_parts) || 0,
+      unique_work_orders: parseInt(summaryResult.rows[0].unique_work_orders) || 0
+    };
+
+    res.json({
+      success: true,
+      data: {
+        orders: ordersResult.rows,
+        summary,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total,
+          totalPages: Math.ceil(total / Number(limit))
+        }
+      }
+    } as ApiResponse);
+
+  } catch (error) {
+    console.error('Get all inventory orders error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch inventory orders'
+    } as ApiResponse);
+  }
+};
+
+
+// Update inventory order status
+export const updateInventoryOrderStatus = async (req: AuthRequest, res: Response) => {
+  try {
+    const { orderId } = req.params;
+    const { status, notes } = req.body;
+    const companyId = req.company?.id;
+    const userId = req.user?.id;
+
+    if (!companyId) {
+      return res.status(403).json({
+        success: false,
+        error: 'No company context found'
+      } as ApiResponse);
+    }
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      } as ApiResponse);
+    }
+
+    // Validate status
+    const validStatuses = ['ordered', 'accepted', 'delivered', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+      } as ApiResponse);
+    }
+
+    // Check if order exists and belongs to the company
+    const checkQuery = `
+      SELECT woio.*, j.company_id
+      FROM work_order_inventory_orders woio
+      JOIN jobs j ON woio.work_order_id = j.id
+      WHERE woio.id = $1 AND j.company_id = $2
+    `;
+    const checkResult = await query(checkQuery, [orderId, companyId]);
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Inventory order not found'
+      } as ApiResponse);
+    }
+
+    const currentOrder = checkResult.rows[0];
+
+    // If status is being changed to 'delivered', update the part stock
+    if (status === 'delivered' && currentOrder.status !== 'delivered') {
+      // Deduct from inventory stock
+      const updateStockQuery = `
+        UPDATE parts
+        SET current_stock = current_stock - $1,
+            updated_at = NOW()
+        WHERE id = $2 AND company_id = $3
+        RETURNING current_stock
+      `;
+      const stockResult = await query(updateStockQuery, [currentOrder.quantity, currentOrder.part_id, companyId]);
+
+      if (stockResult.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'Part not found'
+        } as ApiResponse);
+      }
+
+      // Check if stock went negative
+      if (stockResult.rows[0].current_stock < 0) {
+        // Rollback by adding back the quantity
+        await query(
+          `UPDATE parts SET current_stock = current_stock + $1 WHERE id = $2`,
+          [currentOrder.quantity, currentOrder.part_id]
+        );
+        return res.status(400).json({
+          success: false,
+          error: 'Insufficient stock to deliver this order'
+        } as ApiResponse);
+      }
+    }
+
+    // If status is being changed from 'delivered' to something else, add back to stock
+    if (currentOrder.status === 'delivered' && status !== 'delivered') {
+      await query(
+        `UPDATE parts SET current_stock = current_stock + $1, updated_at = NOW() WHERE id = $2`,
+        [currentOrder.quantity, currentOrder.part_id]
+      );
+    }
+
+    // Update the order status
+    const updateQuery = `
+      UPDATE work_order_inventory_orders
+      SET status = $1,
+          notes = COALESCE($2, notes),
+          updated_at = NOW()
+      WHERE id = $3
+      RETURNING *
+    `;
+    const updateResult = await query(updateQuery, [status, notes, orderId]);
+
+    // Log the status change
+    const logQuery = `
+      INSERT INTO inventory_order_status_log (order_id, old_status, new_status, changed_by, notes)
+      VALUES ($1, $2, $3, $4, $5)
+    `;
+    await query(logQuery, [orderId, currentOrder.status, status, userId, notes]).catch(err => {
+      console.log('Status log insert failed (table may not exist):', err.message);
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: updateResult.rows[0],
+      message: `Order status updated to ${status}`
+    } as ApiResponse);
+
+  } catch (error) {
+    console.error('Update inventory order status error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to update order status'
+    } as ApiResponse);
+  }
+};
+
+// Export inventory orders to PDF
+export const exportInventoryOrdersPDF = async (req: AuthRequest, res: Response) => {
+  try {
+    const {
+      date_from,
+      date_to,
+      technician_id,
+      part_id,
+      work_order_id,
+      status: statusFilter,
+      search
+    } = req.query;
+
+    const companyId = req.company?.id;
+
+    if (!companyId) {
+      return res.status(403).json({
+        success: false,
+        error: 'No company context found'
+      } as ApiResponse);
+    }
+
+    // Build the query (same as getAllInventoryOrders but without pagination)
+    let whereConditions = ['wo.company_id = $1'];
+    let queryParams: any[] = [companyId];
+    let paramIndex = 2;
+
+    if (date_from) {
+      whereConditions.push(`woio.ordered_at >= $${paramIndex}`);
+      queryParams.push(date_from);
+      paramIndex++;
+    }
+
+    if (date_to) {
+      whereConditions.push(`woio.ordered_at <= $${paramIndex}`);
+      queryParams.push(date_to);
+      paramIndex++;
+    }
+
+    if (technician_id) {
+      whereConditions.push(`woio.ordered_by = $${paramIndex}`);
+      queryParams.push(technician_id);
+      paramIndex++;
+    }
+
+    if (part_id) {
+      whereConditions.push(`woio.part_id = $${paramIndex}`);
+      queryParams.push(part_id);
+      paramIndex++;
+    }
+
+    if (work_order_id) {
+      whereConditions.push(`woio.work_order_id = $${paramIndex}`);
+      queryParams.push(work_order_id);
+      paramIndex++;
+    }
+
+    if (statusFilter) {
+      whereConditions.push(`woio.status = $${paramIndex}`);
+      queryParams.push(statusFilter);
+      paramIndex++;
+    }
+
+    if (search) {
+      whereConditions.push(`(
+        p.name ILIKE $${paramIndex} OR
+        p.part_number ILIKE $${paramIndex} OR
+        u.full_name ILIKE $${paramIndex} OR
+        j.job_number ILIKE $${paramIndex}
+      )`);
+      queryParams.push(`%${search}%`);
+      paramIndex++;
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    const ordersQuery = `
+      SELECT
+        woio.id,
+        woio.work_order_id,
+        woio.part_id,
+        woio.quantity,
+        woio.unit_price,
+        woio.total_price,
+        woio.ordered_at,
+        woio.status,
+        woio.notes,
+        p.part_number,
+        p.name as part_name,
+        p.description as part_description,
+        p.category,
+        p.current_stock,
+        u.id as ordered_by_id,
+        u.full_name as ordered_by_name,
+        u.email as ordered_by_email,
+        u.role as ordered_by_role,
+        j.job_number,
+        j.title as work_order_title,
+        j.status as work_order_status,
+        c.name as customer_name
+      FROM work_order_inventory_orders woio
+      JOIN jobs j ON woio.work_order_id = j.id
+      JOIN parts p ON woio.part_id = p.id
+      JOIN users u ON woio.ordered_by = u.id
+      LEFT JOIN customers c ON j.customer_id = c.id
+      WHERE ${whereClause}
+      ORDER BY woio.ordered_at DESC
+    `;
+
+    const ordersResult = await query(ordersQuery, queryParams);
+    const orders = ordersResult.rows;
+
+    // Calculate summary
+    const totalOrders = orders.length;
+    const totalItems = orders.reduce((sum: number, order: any) => sum + order.quantity, 0);
+    const totalValue = orders.reduce((sum: number, order: any) => sum + parseFloat(order.total_price), 0);
+
+    // Create PDF
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+
+    // Set response headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=inventory-orders-${new Date().toISOString().split('T')[0]}.pdf`);
+
+    // Pipe PDF to response
+    doc.pipe(res);
+
+    // Add header
+    doc.fontSize(20).text('Inventory Orders Report', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(10).text(`Generated: ${new Date().toLocaleString()}`, { align: 'center' });
+    doc.moveDown();
+
+    // Add summary
+    doc.fontSize(12).text('Summary', { underline: true });
+    doc.fontSize(10);
+    doc.text(`Total Orders: ${totalOrders}`);
+    doc.text(`Total Items: ${totalItems}`);
+    doc.text(`Total Value: $${totalValue.toFixed(2)}`);
+    doc.moveDown();
+
+    // Add filters info if any
+    if (date_from || date_to || statusFilter || search) {
+      doc.fontSize(12).text('Filters Applied:', { underline: true });
+      doc.fontSize(10);
+      if (date_from) doc.text(`From Date: ${date_from}`);
+      if (date_to) doc.text(`To Date: ${date_to}`);
+      if (statusFilter) doc.text(`Status: ${statusFilter}`);
+      if (search) doc.text(`Search: ${search}`);
+      doc.moveDown();
+    }
+
+    // Add table header
+    doc.fontSize(12).text('Orders', { underline: true });
+    doc.moveDown(0.5);
+
+    // Table headers
+    const tableTop = doc.y;
+    doc.fontSize(8).font('Helvetica-Bold');
+    doc.text('Date', 50, tableTop, { width: 70 });
+    doc.text('Work Order', 120, tableTop, { width: 60 });
+    doc.text('Part', 180, tableTop, { width: 80 });
+    doc.text('Qty', 260, tableTop, { width: 30 });
+    doc.text('Price', 290, tableTop, { width: 50 });
+    doc.text('Ordered By', 340, tableTop, { width: 100 });
+    doc.text('Status', 440, tableTop, { width: 60 });
+
+    doc.moveDown();
+    doc.font('Helvetica');
+
+    // Add orders
+    let yPosition = doc.y;
+    orders.forEach((order: any, index: number) => {
+      // Check if we need a new page
+      if (yPosition > 700) {
+        doc.addPage();
+        yPosition = 50;
+      }
+
+      const orderDate = new Date(order.ordered_at).toLocaleDateString();
+
+      doc.fontSize(7);
+      doc.text(orderDate, 50, yPosition, { width: 70 });
+      doc.text(order.job_number || 'N/A', 120, yPosition, { width: 60 });
+      doc.text(order.part_name.substring(0, 20), 180, yPosition, { width: 80 });
+      doc.text(order.quantity.toString(), 260, yPosition, { width: 30 });
+      doc.text(`$${parseFloat(order.total_price).toFixed(2)}`, 290, yPosition, { width: 50 });
+      doc.text(order.ordered_by_name.substring(0, 25), 340, yPosition, { width: 100 });
+      doc.text(order.status, 440, yPosition, { width: 60 });
+
+      yPosition += 20;
+    });
+
+    // Finalize PDF
+    doc.end();
+
+  } catch (error) {
+    console.error('Export inventory orders PDF error:', error);
+    if (!res.headersSent) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to export PDF'
+      } as ApiResponse);
+    }
+  }
+};

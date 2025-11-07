@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 import { metricsService } from '../services/metricsService';
 import type { WorkshopMetrics, EquipmentRepairStatus } from '../types/workshop';
@@ -11,28 +11,40 @@ interface DateRange {
 const WorkshopMetricsPage: React.FC = () => {
   const [metrics, setMetrics] = useState<WorkshopMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     const today = new Date();
     const thirtyDaysAgo = new Date(today);
     thirtyDaysAgo.setDate(today.getDate() - 30);
-    
+
     return {
       date_from: thirtyDaysAgo.toISOString().split('T')[0],
       date_to: today.toISOString().split('T')[0],
     };
   });
 
-  useEffect(() => {
-    loadMetrics();
-  }, [dateRange]);
-
-  const loadMetrics = async () => {
+  const loadMetrics = useCallback(async (isManualRefresh = false) => {
     try {
-      setLoading(true);
+      if (isManualRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
       const response = await metricsService.getWorkshopMetrics(dateRange);
 
       if (response.success && response.data) {
         setMetrics(response.data);
+        setLastUpdated(new Date());
+
+        if (isManualRefresh) {
+          toast.success('Metrics updated', {
+            duration: 2000,
+            icon: '🔄',
+          });
+        }
       } else {
         toast.error(response.error || 'Failed to load workshop metrics');
       }
@@ -41,6 +53,32 @@ const WorkshopMetricsPage: React.FC = () => {
       toast.error('Failed to load workshop metrics');
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [dateRange]);
+
+  // Initial load and when date range changes
+  useEffect(() => {
+    loadMetrics();
+  }, [dateRange]);
+
+  const handleManualRefresh = () => {
+    loadMetrics(true);
+  };
+
+  const formatLastUpdated = (date: Date | null): string => {
+    if (!date) return 'Never';
+
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) {
+      return 'Just now';
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    } else {
+      return date.toLocaleTimeString();
     }
   };
 
@@ -113,36 +151,53 @@ const WorkshopMetricsPage: React.FC = () => {
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Workshop Metrics</h1>
-        <p className="text-gray-600 mt-1">Performance analytics and key metrics for workshop operations</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Workshop Metrics</h1>
+            <p className="text-gray-600 mt-1">Performance analytics and key metrics for workshop operations</p>
+          </div>
+
+          {/* Last Updated Indicator */}
+          {lastUpdated && (
+            <div className="text-sm text-gray-500">
+              <i className="ri-time-line mr-1"></i>
+              Updated {formatLastUpdated(lastUpdated)}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Date Range Selector */}
+      {/* Date Range Selector and Controls */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-gray-700">From:</label>
-            <input
-              type="date"
-              value={dateRange.date_from}
-              onChange={(e) => handleDateChange('date_from', e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium text-gray-700">From:</label>
+              <input
+                type="date"
+                value={dateRange.date_from}
+                onChange={(e) => handleDateChange('date_from', e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium text-gray-700">To:</label>
+              <input
+                type="date"
+                value={dateRange.date_to}
+                onChange={(e) => handleDateChange('date_to', e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-gray-700">To:</label>
-            <input
-              type="date"
-              value={dateRange.date_to}
-              onChange={(e) => handleDateChange('date_to', e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+
+          {/* Manual refresh button */}
           <button
-            onClick={loadMetrics}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <i className="ri-refresh-line mr-2"></i>
+            <i className={`ri-refresh-line mr-2 ${isRefreshing ? 'animate-spin' : ''}`}></i>
             Refresh
           </button>
         </div>
@@ -151,11 +206,15 @@ const WorkshopMetricsPage: React.FC = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         {/* Total Jobs */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 transition-all duration-300 ${
+          isRefreshing ? 'ring-2 ring-blue-200 scale-[1.02]' : ''
+        }`}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Jobs</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{metrics.total_jobs}</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2 transition-all duration-300">
+                {metrics.total_jobs}
+              </p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <i className="ri-tools-line text-2xl text-blue-600"></i>
@@ -164,11 +223,13 @@ const WorkshopMetricsPage: React.FC = () => {
         </div>
 
         {/* Average Repair Time */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 transition-all duration-300 ${
+          isRefreshing ? 'ring-2 ring-orange-200 scale-[1.02]' : ''
+        }`}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Avg Repair Time</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">
+              <p className="text-3xl font-bold text-gray-900 mt-2 transition-all duration-300">
                 {formatHours(metrics.average_repair_time_hours)}
               </p>
             </div>
@@ -179,11 +240,13 @@ const WorkshopMetricsPage: React.FC = () => {
         </div>
 
         {/* On-Time Completion Rate */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 transition-all duration-300 ${
+          isRefreshing ? 'ring-2 ring-green-200 scale-[1.02]' : ''
+        }`}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">On-Time Rate</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">
+              <p className="text-3xl font-bold text-gray-900 mt-2 transition-all duration-300">
                 {formatPercentage(metrics.on_time_completion_rate)}
               </p>
             </div>
@@ -194,11 +257,13 @@ const WorkshopMetricsPage: React.FC = () => {
         </div>
 
         {/* Capacity Utilization */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 transition-all duration-300 ${
+          isRefreshing ? 'ring-2 ring-purple-200 scale-[1.02]' : ''
+        }`}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Capacity Utilization</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">
+              <p className="text-3xl font-bold text-gray-900 mt-2 transition-all duration-300">
                 {formatPercentage(metrics.current_capacity_utilization)}
               </p>
             </div>
@@ -211,24 +276,33 @@ const WorkshopMetricsPage: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Jobs by Status Chart */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Jobs by Status</h2>
+        <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 transition-all duration-300 ${
+          isRefreshing ? 'ring-2 ring-blue-200' : ''
+        }`}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Jobs by Status</h2>
+            {isRefreshing && (
+              <i className="ri-refresh-line text-blue-600 animate-spin"></i>
+            )}
+          </div>
           <div className="space-y-3">
             {Object.entries(metrics.jobs_by_status).map(([status, count]) => {
               const statusKey = status as EquipmentRepairStatus;
               const percentage = metrics.total_jobs > 0 ? (count / metrics.total_jobs) * 100 : 0;
-              
+
               return (
                 <div key={status} className="space-y-1">
                   <div className="flex items-center justify-between">
                     <span className={`text-sm font-medium px-2 py-1 rounded ${getStatusColor(statusKey)}`}>
                       {getStatusLabel(statusKey)}
                     </span>
-                    <span className="text-sm font-semibold text-gray-900">{count}</span>
+                    <span className="text-sm font-semibold text-gray-900 transition-all duration-300">
+                      {count}
+                    </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-out"
                       style={{ width: `${percentage}%` }}
                     ></div>
                   </div>
@@ -239,8 +313,15 @@ const WorkshopMetricsPage: React.FC = () => {
         </div>
 
         {/* Jobs per Technician Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Jobs per Technician</h2>
+        <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 transition-all duration-300 ${
+          isRefreshing ? 'ring-2 ring-blue-200' : ''
+        }`}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Jobs per Technician</h2>
+            {isRefreshing && (
+              <i className="ri-refresh-line text-blue-600 animate-spin"></i>
+            )}
+          </div>
           {metrics.jobs_per_technician.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -252,10 +333,10 @@ const WorkshopMetricsPage: React.FC = () => {
                 </thead>
                 <tbody>
                   {metrics.jobs_per_technician.map((tech) => (
-                    <tr key={tech.technician_id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <tr key={tech.technician_id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                       <td className="py-3 px-2 text-sm text-gray-900">{tech.technician_name}</td>
                       <td className="py-3 px-2 text-sm text-gray-900 text-right">
-                        <span className="inline-flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-700 rounded-full font-semibold">
+                        <span className="inline-flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-700 rounded-full font-semibold transition-all duration-300">
                           {tech.active_jobs}
                         </span>
                       </td>

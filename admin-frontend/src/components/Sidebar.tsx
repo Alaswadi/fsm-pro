@@ -62,6 +62,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
       path: '/inventory',
     },
     {
+      id: 'inventory-orders',
+      label: 'Inventory Orders',
+      icon: 'ri-file-list-3-line',
+      path: '/inventory-orders',
+    },
+    {
       id: 'analytics',
       label: 'Analytics',
       icon: 'ri-bar-chart-line',

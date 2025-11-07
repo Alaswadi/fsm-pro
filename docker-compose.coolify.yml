@@ -1,0 +1,103 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: fsm-postgres-coolify
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "7432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    networks:
+      - fsm-network
+
+  # Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    container_name: fsm-redis-coolify
+    ports:
+      - "7379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - fsm-network
+
+  # API Backend
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.coolify
+    container_name: fsm-api-coolify
+    ports:
+      - "7001:7001"
+    environment:
+      - NODE_ENV=production
+      - PORT=7001
+      - DATABASE_URL=${DATABASE_URL}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+      - REDIS_URL=redis://redis:6379
+      - CORS_ORIGIN=${CORS_ORIGIN}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE}
+      - UPLOAD_PATH=${UPLOAD_PATH}
+    volumes:
+      - ./api/uploads:/app/uploads
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    networks:
+      - fsm-network
+
+  # Admin Frontend
+  admin:
+    build:
+      context: ./admin-frontend
+      dockerfile: Dockerfile.coolify
+    container_name: fsm-admin-coolify
+    ports:
+      - "7000:7000"
+    environment:
+      - REACT_APP_API_URL=${REACT_APP_API_URL}
+      - PORT=7000
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - fsm-network
+
+  # Nginx Reverse Proxy
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile.coolify
+    container_name: fsm-nginx-coolify
+    ports:
+      - "7080:80"
+    depends_on:
+      - api
+      - admin
+    restart: unless-stopped
+    networks:
+      - fsm-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  fsm-network:
+    driver: bridge
+

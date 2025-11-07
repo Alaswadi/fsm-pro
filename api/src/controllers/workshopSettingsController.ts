@@ -74,7 +74,7 @@ export const updateWorkshopSettings = async (req: AuthRequest, res: Response) =>
 
     // Validate numeric fields
     if (max_concurrent_jobs !== undefined) {
-      if (typeof max_concurrent_jobs !== 'number' || max_concurrent_jobs < 1) {
+      if (typeof max_concurrent_jobs !== 'number' || isNaN(max_concurrent_jobs) || max_concurrent_jobs < 1) {
         return res.status(400).json({
           success: false,
           error: 'max_concurrent_jobs must be a positive number'
@@ -83,7 +83,7 @@ export const updateWorkshopSettings = async (req: AuthRequest, res: Response) =>
     }
 
     if (max_jobs_per_technician !== undefined) {
-      if (typeof max_jobs_per_technician !== 'number' || max_jobs_per_technician < 1) {
+      if (typeof max_jobs_per_technician !== 'number' || isNaN(max_jobs_per_technician) || max_jobs_per_technician < 1) {
         return res.status(400).json({
           success: false,
           error: 'max_jobs_per_technician must be a positive number'
@@ -92,7 +92,7 @@ export const updateWorkshopSettings = async (req: AuthRequest, res: Response) =>
     }
 
     if (default_estimated_repair_hours !== undefined) {
-      if (typeof default_estimated_repair_hours !== 'number' || default_estimated_repair_hours < 1) {
+      if (typeof default_estimated_repair_hours !== 'number' || isNaN(default_estimated_repair_hours) || default_estimated_repair_hours < 1) {
         return res.status(400).json({
           success: false,
           error: 'default_estimated_repair_hours must be a positive number'
@@ -101,7 +101,7 @@ export const updateWorkshopSettings = async (req: AuthRequest, res: Response) =>
     }
 
     if (default_pickup_delivery_fee !== undefined) {
-      if (typeof default_pickup_delivery_fee !== 'number' || default_pickup_delivery_fee < 0) {
+      if (typeof default_pickup_delivery_fee !== 'number' || isNaN(default_pickup_delivery_fee) || default_pickup_delivery_fee < 0) {
         return res.status(400).json({
           success: false,
           error: 'default_pickup_delivery_fee must be a non-negative number'
