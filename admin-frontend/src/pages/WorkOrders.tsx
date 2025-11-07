@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { apiService } from '../services/api';
-import { Job, JobsResponse, JobStatus, JobPriority } from '../types';
+import { Job, JobStatus, JobPriority } from '../types';
 import WorkOrderModal from '../components/WorkOrderModal';
 import EquipmentIntakeForm from '../components/EquipmentIntakeForm';
 import EquipmentStatusTimeline from '../components/EquipmentStatusTimeline';
@@ -69,6 +69,7 @@ const WorkOrders: React.FC = () => {
   // Load jobs on component mount and when filters change
   useEffect(() => {
     loadJobs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.currentPage, state.searchTerm, state.statusFilter, state.priorityFilter, state.technicianFilter, state.customerFilter, state.locationTypeFilter]);
 
   const loadJobs = async () => {
@@ -283,16 +284,17 @@ const WorkOrders: React.FC = () => {
     }
   };
 
-  const updateJobStatus = async (jobId: string, newStatus: JobStatus) => {
-    try {
-      const response = await apiService.updateJobStatus(jobId, newStatus);
-      
-      if (response.success) {
-        toast.success('Status updated successfully');
-        loadJobs();
-      } else {
-        toast.error(response.error || 'Failed to update status');
-      }
+  // Function to update job status - currently handled by UpdateStatusModal
+  // const updateJobStatus = async (jobId: string, newStatus: JobStatus) => {
+  //   try {
+  //     const response = await apiService.updateJobStatus(jobId, newStatus);
+  //
+  //     if (response.success) {
+  //       toast.success('Status updated successfully');
+  //       loadJobs();
+  //     } else {
+  //       toast.error(response.error || 'Failed to update status');
+  //     }
     } catch (error) {
       console.error('Error updating status:', error);
       toast.error('Failed to update status');

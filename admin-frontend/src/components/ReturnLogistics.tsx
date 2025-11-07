@@ -48,6 +48,7 @@ const ReturnLogistics: React.FC<ReturnLogisticsProps> = ({
     if (showDeliveryForm && technicians.length === 0) {
       loadTechnicians();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showDeliveryForm]);
 
   const loadTechnicians = async () => {

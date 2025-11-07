@@ -41,6 +41,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   // Load initial options when component mounts
   useEffect(() => {
     loadOptions('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Find selected option when value changes

@@ -41,7 +41,7 @@ const EquipmentIntakeForm: React.FC<EquipmentIntakeFormProps> = ({
 
   // Photo state
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
-  const [existingPhotos, setExistingPhotos] = useState<IntakePhoto[]>(existingIntake?.photos || []);
+  const [existingPhotos] = useState<IntakePhoto[]>(existingIntake?.photos || []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Calculate estimated completion date

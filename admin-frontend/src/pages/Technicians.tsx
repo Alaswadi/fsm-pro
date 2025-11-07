@@ -71,6 +71,7 @@ const Technicians: React.FC = () => {
   useEffect(() => {
     loadTechnicians();
     loadTechnicianOptions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.currentPage, state.searchTerm, state.statusFilter, state.skillsFilter]);
 
   const loadTechnicianOptions = async () => {

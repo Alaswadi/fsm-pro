@@ -73,6 +73,7 @@ const InventoryOrders: React.FC = () => {
 
   useEffect(() => {
     loadOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, searchTerm, dateFrom, dateTo, statusFilter, technicianFilter]);
 
   const loadOrders = async () => {

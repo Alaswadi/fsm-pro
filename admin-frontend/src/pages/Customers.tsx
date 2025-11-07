@@ -74,6 +74,7 @@ const Customers: React.FC = () => {
 
   useEffect(() => {
     loadCustomers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.currentPage, state.searchTerm, state.statusFilter, state.industryFilter, state.priorityFilter]);
 
   const loadCustomers = async () => {

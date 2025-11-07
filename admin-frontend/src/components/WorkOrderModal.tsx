@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'react-hot-toast';
 import { apiService } from '../services/api';
-import { Job, JobOptions, CustomerEquipmentForJob, JobPriority, JobStatus, LocationType } from '../types';
+import { Job, JobOptions, JobPriority, JobStatus, LocationType } from '../types';
 import SearchableSelect from './SearchableSelect';
 
 interface WorkOrderModalProps {
@@ -42,7 +42,6 @@ const WorkOrderModal: React.FC<WorkOrderModalProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(true);
-  const [options, setOptions] = useState<JobOptions | null>(null);
 
   const [formData, setFormData] = useState<FormData>({
     customer_id: '',

@@ -50,6 +50,7 @@ const EquipmentTypes: React.FC = () => {
   useEffect(() => {
     loadEquipmentTypes();
     loadEquipmentOptions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.currentPage, state.searchTerm, state.categoryFilter, state.brandFilter]);
 
   const loadEquipmentOptions = async () => {

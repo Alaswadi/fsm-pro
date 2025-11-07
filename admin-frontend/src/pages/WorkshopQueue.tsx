@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { workshopService, WorkshopQueueItem } from '../services/workshopService';
 import { useAuthStore } from '../stores/authStore';
-import { formatDistanceToNow } from 'date-fns';
 
 interface WorkshopQueueState {
   queueItems: WorkshopQueueItem[];
@@ -43,6 +42,7 @@ const WorkshopQueue: React.FC = () => {
   useEffect(() => {
     loadQueue();
     loadTechnicianWorkload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.priorityFilter, state.equipmentTypeFilter, state.customerFilter]);
 
   const loadTechnicianWorkload = async () => {

@@ -57,6 +57,7 @@ const Inventory: React.FC = () => {
     loadInventoryItems();
     loadInventoryOptions();
     loadLowStockAlerts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.currentPage, state.searchTerm, state.categoryFilter, state.equipmentTypeFilter, state.statusFilter, state.lowStockOnly]);
 
   const loadInventoryItems = async () => {

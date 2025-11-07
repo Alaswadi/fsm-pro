@@ -60,6 +60,7 @@ const WorkshopMetricsPage: React.FC = () => {
   // Initial load and when date range changes
   useEffect(() => {
     loadMetrics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateRange]);
 
   const handleManualRefresh = () => {

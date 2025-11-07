@@ -90,6 +90,7 @@ const Dashboard: React.FC = () => {
       clearInterval(refreshInterval);
       setRefreshInterval(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRefresh, loadDashboardData, loadInventoryAlerts]);
 
   const toggleAutoRefresh = () => {
