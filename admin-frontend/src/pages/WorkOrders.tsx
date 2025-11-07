@@ -295,11 +295,11 @@ const WorkOrders: React.FC = () => {
   //     } else {
   //       toast.error(response.error || 'Failed to update status');
   //     }
-    } catch (error) {
-      console.error('Error updating status:', error);
-      toast.error('Failed to update status');
-    }
-  };
+  //   } catch (error) {
+  //     console.error('Error updating status:', error);
+  //     toast.error('Failed to update status');
+  //   }
+  // };
 
   const getStatusBadge = (status: JobStatus) => {
     const statusConfig = {

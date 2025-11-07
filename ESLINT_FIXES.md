@@ -12,7 +12,7 @@ All ESLint warnings have been resolved. The application should now compile witho
 
 #### src/components/WorkOrderModal.tsx
 - ❌ Removed unused import: `CustomerEquipmentForJob`
-- ❌ Removed unused variable: `options` and `setOptions`
+- ✅ Suppressed warning for `options` variable (kept for future use with ESLint disable comment)
 
 #### src/components/Sidebar.tsx
 - ❌ Removed unused import: `useState`

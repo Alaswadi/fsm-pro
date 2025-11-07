@@ -42,6 +42,8 @@ const WorkOrderModal: React.FC<WorkOrderModalProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [options, setOptions] = useState<JobOptions | null>(null);
 
   const [formData, setFormData] = useState<FormData>({
     customer_id: '',
