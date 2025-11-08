@@ -14,6 +14,7 @@ interface ConfigurationForm {
   timezone: string;
   currency: string;
   dateFormat: string;
+  includeDemoData: boolean;
 }
 
 const ConfigurationStep: React.FC<ConfigurationStepProps> = ({
@@ -32,6 +33,7 @@ const ConfigurationStep: React.FC<ConfigurationStepProps> = ({
       timezone: data.timezone || 'America/New_York',
       currency: data.currency || 'USD',
       dateFormat: data.dateFormat || 'MM/DD/YYYY',
+      includeDemoData: data.includeDemoData !== undefined ? data.includeDemoData : true,
     },
   });
 
@@ -40,6 +42,7 @@ const ConfigurationStep: React.FC<ConfigurationStepProps> = ({
       timezone: formData.timezone,
       currency: formData.currency,
       dateFormat: formData.dateFormat,
+      includeDemoData: formData.includeDemoData,
     });
     onSubmit();
   };
@@ -132,6 +135,39 @@ const ConfigurationStep: React.FC<ConfigurationStepProps> = ({
           <p className="mt-1 text-xs text-gray-500">
             This will be used throughout the system
           </p>
+        </div>
+
+        {/* Demo Data Option */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start">
+            <div className="flex items-center h-5">
+              <input
+                {...register('includeDemoData')}
+                type="checkbox"
+                id="includeDemoData"
+                className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary focus:ring-2"
+              />
+            </div>
+            <div className="ml-3">
+              <label htmlFor="includeDemoData" className="font-medium text-blue-900 cursor-pointer">
+                Include demo data
+              </label>
+              <p className="text-sm text-blue-700 mt-1">
+                Populate your system with sample data including equipment types, customers, inventory items,
+                and skills. This helps you explore the system features immediately. You can delete this data later.
+              </p>
+              <div className="mt-2 text-xs text-blue-600">
+                <strong>Demo data includes:</strong>
+                <ul className="list-disc list-inside mt-1 space-y-0.5">
+                  <li>10 Equipment Types (HVAC, Furnace, Water Heater, etc.)</li>
+                  <li>8 Company Skills (Installation, Repair, Maintenance, etc.)</li>
+                  <li>5 Certifications (EPA 608, NATE, OSHA, etc.)</li>
+                  <li>3 Sample Customers (Residential & Commercial)</li>
+                  <li>8 Inventory Items (Filters, Parts, Refrigerant, etc.)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Info Box */}

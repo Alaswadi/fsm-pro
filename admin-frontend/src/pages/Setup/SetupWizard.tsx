@@ -14,17 +14,20 @@ export interface SetupData {
   adminPassword: string;
   adminFullName: string;
   adminPhone: string;
-  
+
   // Company
   companyName: string;
   companyAddress: string;
   companyPhone: string;
   companyEmail: string;
-  
+
   // Configuration
   timezone: string;
   currency: string;
   dateFormat: string;
+
+  // Demo data
+  includeDemoData: boolean;
 }
 
 const SetupWizard: React.FC = () => {
@@ -42,7 +45,8 @@ const SetupWizard: React.FC = () => {
     companyEmail: '',
     timezone: 'America/New_York',
     currency: 'USD',
-    dateFormat: 'MM/DD/YYYY'
+    dateFormat: 'MM/DD/YYYY',
+    includeDemoData: true // Default to true for better first-time experience
   });
 
   const totalSteps = 5;
