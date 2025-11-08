@@ -5,8 +5,14 @@ class ApiService {
   private api: AxiosInstance;
 
   constructor() {
-    const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+    // Use relative URL in production to work with nginx reverse proxy
+    // In development, use localhost
+    const baseURL = process.env.NODE_ENV === 'production'
+      ? '/api'  // Relative URL - works with nginx reverse proxy
+      : (process.env.REACT_APP_API_URL || 'http://localhost:3001/api');
+
     console.log('API Base URL:', baseURL);
+    console.log('Environment:', process.env.NODE_ENV);
 
     this.api = axios.create({
       baseURL,

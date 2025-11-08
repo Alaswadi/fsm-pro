@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+// import { Platform } from 'react-native'; // Uncomment if using local development API
 import {
   ApiResponse,
   LoginCredentials,
@@ -23,19 +23,23 @@ class ApiService {
 
   constructor() {
     // Use appropriate API URL based on platform
-    if (__DEV__) {
-      // Development environment
-      if (Platform.OS === 'web') {
-        // Web environment
-        this.baseURL = 'http://localhost:3001/api';
-      } else {
-        // Mobile environment (iOS/Android) - use network IP for physical device/emulator on network
-        this.baseURL = 'http://192.168.0.59:3001/api';
-      }
-    } else {
-      // Production environment
-      this.baseURL = 'https://your-production-api.com/api';
-    }
+    // PRODUCTION API - Using same domain as admin app (via nginx reverse proxy)
+    this.baseURL = 'https://fsmpro.phishsimulator.com/api';
+
+    // DEVELOPMENT API - Uncomment below to use local API during development
+    // if (__DEV__) {
+    //   // Development environment
+    //   if (Platform.OS === 'web') {
+    //     // Web environment
+    //     this.baseURL = 'http://localhost:3001/api';
+    //   } else {
+    //     // Mobile environment (iOS/Android) - use network IP for physical device/emulator on network
+    //     this.baseURL = 'http://192.168.0.59:3001/api';
+    //   }
+    // } else {
+    //   // Production environment
+    //   this.baseURL = 'https://fsmpro.phishsimulator.com/api';
+    // }
 
     this.api = axios.create({
       baseURL: this.baseURL,
