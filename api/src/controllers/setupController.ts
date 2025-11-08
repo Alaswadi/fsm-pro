@@ -101,12 +101,20 @@ export const initializeSetup = async (req: Request, res: Response) => {
       // Hash the password
       const passwordHash = await bcrypt.hash(adminPassword, 10);
 
-      // Create the company
+      // Create the company with configuration settings
       const companyResult = await client.query(
-        `INSERT INTO companies (name, address, phone, email, is_active, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, true, NOW(), NOW())
-         RETURNING id, name, email`,
-        [companyName, companyAddress || '', companyPhone || '', companyEmail || adminEmail]
+        `INSERT INTO companies (name, address, phone, email, timezone, currency, date_format, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW(), NOW())
+         RETURNING id, name, email, timezone, currency, date_format`,
+        [
+          companyName,
+          companyAddress || '',
+          companyPhone || '',
+          companyEmail || adminEmail,
+          timezone || 'America/New_York',
+          currency || 'USD',
+          dateFormat || 'MM/DD/YYYY'
+        ]
       );
 
       const company = companyResult.rows[0];
@@ -120,25 +128,6 @@ export const initializeSetup = async (req: Request, res: Response) => {
       );
 
       const user = userResult.rows[0];
-
-      // Create company settings if configuration provided
-      if (timezone || currency || dateFormat) {
-        await client.query(
-          `INSERT INTO company_settings (company_id, timezone, currency, date_format, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, NOW(), NOW())
-           ON CONFLICT (company_id) DO UPDATE
-           SET timezone = EXCLUDED.timezone,
-               currency = EXCLUDED.currency,
-               date_format = EXCLUDED.date_format,
-               updated_at = NOW()`,
-          [
-            company.id,
-            timezone || 'America/New_York',
-            currency || 'USD',
-            dateFormat || 'MM/DD/YYYY'
-          ]
-        );
-      }
 
       return {
         company,
