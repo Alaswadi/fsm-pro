@@ -80,9 +80,13 @@ const SetupWizard: React.FC = () => {
         };
       }>('/setup/initialize', setupData);
 
-      // If we get here, setup was successful (no error thrown)
-      toast.success('Setup completed successfully!');
-      setCurrentStep(5); // Move to completion step
+      // Check if setup was successful
+      if (response.success && response.data) {
+        toast.success('Setup completed successfully!');
+        setCurrentStep(5); // Move to completion step
+      } else {
+        toast.error(response.error || 'Setup failed');
+      }
     } catch (error: any) {
       console.error('Setup error:', error);
       toast.error(error.response?.data?.error || 'Failed to complete setup');

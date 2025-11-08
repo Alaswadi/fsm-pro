@@ -47,7 +47,7 @@ const App: React.FC = () => {
           userCount: number;
           companyCount: number;
         }>('/setup/check');
-        setSetupNeeded(response.setupNeeded);
+        setSetupNeeded(response.data?.setupNeeded ?? false);
       } catch (error) {
         console.error('Error checking setup status:', error);
         setSetupNeeded(false); // Assume setup is not needed if check fails
