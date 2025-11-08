@@ -43,14 +43,11 @@ const App: React.FC = () => {
     const checkSetup = async () => {
       try {
         const response = await api.get<{
-          success: boolean;
-          data: {
-            setupNeeded: boolean;
-            userCount: number;
-            companyCount: number;
-          };
+          setupNeeded: boolean;
+          userCount: number;
+          companyCount: number;
         }>('/setup/check');
-        setSetupNeeded(response.data.data.setupNeeded);
+        setSetupNeeded(response.setupNeeded);
       } catch (error) {
         console.error('Error checking setup status:', error);
         setSetupNeeded(false); // Assume setup is not needed if check fails

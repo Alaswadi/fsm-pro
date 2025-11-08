@@ -67,29 +67,22 @@ const SetupWizard: React.FC = () => {
     setIsSubmitting(true);
     try {
       const response = await api.post<{
-        success: boolean;
-        data?: {
-          user: {
-            id: string;
-            email: string;
-            fullName: string;
-            role: string;
-          };
-          company: {
-            id: string;
-            name: string;
-            email: string;
-          };
+        user: {
+          id: string;
+          email: string;
+          fullName: string;
+          role: string;
         };
-        error?: string;
+        company: {
+          id: string;
+          name: string;
+          email: string;
+        };
       }>('/setup/initialize', setupData);
 
-      if (response.data.success) {
-        toast.success('Setup completed successfully!');
-        setCurrentStep(5); // Move to completion step
-      } else {
-        toast.error(response.data.error || 'Setup failed');
-      }
+      // If we get here, setup was successful (no error thrown)
+      toast.success('Setup completed successfully!');
+      setCurrentStep(5); // Move to completion step
     } catch (error: any) {
       console.error('Setup error:', error);
       toast.error(error.response?.data?.error || 'Failed to complete setup');
