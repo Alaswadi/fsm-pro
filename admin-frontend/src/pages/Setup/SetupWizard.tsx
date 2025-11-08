@@ -66,8 +66,24 @@ const SetupWizard: React.FC = () => {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      const response = await api.post('/setup/initialize', setupData);
-      
+      const response = await api.post<{
+        success: boolean;
+        data?: {
+          user: {
+            id: string;
+            email: string;
+            fullName: string;
+            role: string;
+          };
+          company: {
+            id: string;
+            name: string;
+            email: string;
+          };
+        };
+        error?: string;
+      }>('/setup/initialize', setupData);
+
       if (response.data.success) {
         toast.success('Setup completed successfully!');
         setCurrentStep(5); // Move to completion step
