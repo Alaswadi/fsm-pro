@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import setupRoutes from './setup';
 import authRoutes from './auth';
 import techniciansRoutes from './technicians';
 import customersRoutes from './customers';
@@ -49,6 +50,10 @@ router.get('/health/db', async (req, res) => {
 });
 
 // API routes
+// Setup routes (must be first, no authentication required)
+router.use('/setup', setupRoutes);
+
+// All other routes
 router.use('/auth', authRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/technicians', techniciansRoutes);
