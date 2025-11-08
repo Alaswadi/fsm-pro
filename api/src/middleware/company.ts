@@ -25,24 +25,7 @@ export const addCompanyContext = async (req: Request, res: Response, next: NextF
       return next(); // Let other middleware handle authentication
     }
 
-    // First check if user is a technician
-    const techResult = await query(
-      'SELECT t.company_id, c.name FROM technicians t JOIN companies c ON t.company_id = c.id WHERE t.user_id = $1',
-      [userId]
-    );
-
-    console.log('[Company Middleware] Technician check result:', techResult.rows.length);
-
-    if (techResult.rows.length > 0) {
-      req.company = {
-        id: techResult.rows[0].company_id,
-        name: techResult.rows[0].name
-      };
-      console.log('[Company Middleware] Set company from technician:', req.company);
-      return next();
-    }
-
-    // If not a technician, check if user is an admin/manager and get the first company
+    // Get user role first
     const userResult = await query(
       'SELECT role FROM users WHERE id = $1',
       [userId]
@@ -50,12 +33,40 @@ export const addCompanyContext = async (req: Request, res: Response, next: NextF
 
     console.log('[Company Middleware] User role check:', userResult.rows.length > 0 ? userResult.rows[0].role : 'none');
 
-    if (userResult.rows.length > 0) {
-      const userRole = userResult.rows[0].role;
+    if (userResult.rows.length === 0) {
+      console.log('[Company Middleware] User not found');
+      return next();
+    }
 
-      if (['super_admin', 'admin', 'manager'].includes(userRole)) {
-        // For admin users, get the first company (in a real multi-tenant system,
-        // this would be based on user's company assignment)
+    const userRole = userResult.rows[0].role;
+
+    // For technicians, try to get company from technicians table
+    if (userRole === 'technician') {
+      try {
+        const techResult = await query(
+          'SELECT t.company_id, c.name FROM technicians t JOIN companies c ON t.company_id = c.id WHERE t.user_id = $1',
+          [userId]
+        );
+
+        console.log('[Company Middleware] Technician check result:', techResult.rows.length);
+
+        if (techResult.rows.length > 0) {
+          req.company = {
+            id: techResult.rows[0].company_id,
+            name: techResult.rows[0].name
+          };
+          console.log('[Company Middleware] Set company from technician:', req.company);
+          return next();
+        }
+      } catch (techError) {
+        console.error('[Company Middleware] Error checking technician:', techError);
+        // Continue to admin fallback
+      }
+    }
+
+    // For admin/manager/super_admin users, get the first active company
+    if (['super_admin', 'admin', 'manager'].includes(userRole)) {
+      try {
         const companyResult = await query(
           'SELECT id, name FROM companies WHERE is_active = true ORDER BY created_at LIMIT 1'
         );
@@ -68,7 +79,11 @@ export const addCompanyContext = async (req: Request, res: Response, next: NextF
             name: companyResult.rows[0].name
           };
           console.log('[Company Middleware] Set company from admin:', req.company);
+        } else {
+          console.log('[Company Middleware] No active companies found');
         }
+      } catch (companyError) {
+        console.error('[Company Middleware] Error fetching company:', companyError);
       }
     }
 

@@ -14,6 +14,7 @@ import intakeRoutes from './intake';
 import statusRoutes from './status';
 import workshopRoutes from './workshop';
 import invoiceRoutes from './invoices';
+import diagnosticsRoutes from './diagnostics';
 import { query } from '../config/database';
 
 const router = Router();
@@ -52,6 +53,9 @@ router.get('/health/db', async (req, res) => {
 // API routes
 // Setup routes (must be first, no authentication required)
 router.use('/setup', setupRoutes);
+
+// Diagnostics routes (public health check, protected context check)
+router.use('/diagnostics', diagnosticsRoutes);
 
 // All other routes
 router.use('/auth', authRoutes);
