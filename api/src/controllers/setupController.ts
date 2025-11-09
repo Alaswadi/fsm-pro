@@ -10,28 +10,30 @@ import { ApiResponse } from '../types';
 async function seedDemoData(client: any, companyId: string) {
   console.log('[Setup] Seeding demo data for company:', companyId);
 
-  // 1. Create Equipment Types (with brand and model as required by schema)
-  const equipmentTypes = [
-    { name: 'HVAC System', brand: 'Carrier', model: 'Infinity 24', description: 'High-efficiency heating and cooling system', category: 'HVAC' },
-    { name: 'Furnace', brand: 'Trane', model: 'XC95m', description: 'Gas furnace with modulating heat', category: 'HVAC' },
-    { name: 'Air Conditioner', brand: 'Lennox', model: 'XC25', description: 'Variable-capacity air conditioner', category: 'HVAC' },
-    { name: 'Heat Pump', brand: 'Carrier', model: 'Greenspeed', description: 'Variable-speed heat pump system', category: 'HVAC' },
-    { name: 'Water Heater', brand: 'Rheem', model: 'ProTerra', description: 'Hybrid electric water heater', category: 'Plumbing' },
-    { name: 'Boiler', brand: 'Weil-McLain', model: 'Ultra', description: 'High-efficiency gas boiler', category: 'HVAC' },
-    { name: 'Thermostat', brand: 'Honeywell', model: 'T6 Pro', description: 'Programmable smart thermostat', category: 'Controls' },
-    { name: 'Air Handler', brand: 'Goodman', model: 'ARUF', description: 'Multi-position air handler', category: 'HVAC' },
-    { name: 'Ductwork', brand: 'Hart & Cooley', model: 'FlexAir', description: 'Flexible duct system', category: 'HVAC' },
-    { name: 'Refrigeration Unit', brand: 'True', model: 'T-49F', description: 'Commercial reach-in freezer', category: 'Refrigeration' },
-  ];
+  try {
+    // 1. Create Equipment Types (with brand and model as required by schema)
+    console.log('[Setup] Creating equipment types...');
+    const equipmentTypes = [
+      { name: 'HVAC System', brand: 'Carrier', model: 'Infinity 24', description: 'High-efficiency heating and cooling system', category: 'HVAC' },
+      { name: 'Furnace', brand: 'Trane', model: 'XC95m', description: 'Gas furnace with modulating heat', category: 'HVAC' },
+      { name: 'Air Conditioner', brand: 'Lennox', model: 'XC25', description: 'Variable-capacity air conditioner', category: 'HVAC' },
+      { name: 'Heat Pump', brand: 'Carrier', model: 'Greenspeed', description: 'Variable-speed heat pump system', category: 'HVAC' },
+      { name: 'Water Heater', brand: 'Rheem', model: 'ProTerra', description: 'Hybrid electric water heater', category: 'Plumbing' },
+      { name: 'Boiler', brand: 'Weil-McLain', model: 'Ultra', description: 'High-efficiency gas boiler', category: 'HVAC' },
+      { name: 'Thermostat', brand: 'Honeywell', model: 'T6 Pro', description: 'Programmable smart thermostat', category: 'Controls' },
+      { name: 'Air Handler', brand: 'Goodman', model: 'ARUF', description: 'Multi-position air handler', category: 'HVAC' },
+      { name: 'Ductwork', brand: 'Hart & Cooley', model: 'FlexAir', description: 'Flexible duct system', category: 'HVAC' },
+      { name: 'Refrigeration Unit', brand: 'True', model: 'T-49F', description: 'Commercial reach-in freezer', category: 'Refrigeration' },
+    ];
 
-  for (const equipType of equipmentTypes) {
-    await client.query(
-      `INSERT INTO equipment_types (company_id, name, brand, model, description, category, is_active, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), NOW())`,
-      [companyId, equipType.name, equipType.brand, equipType.model, equipType.description, equipType.category]
-    );
-  }
-  console.log('[Setup] Created', equipmentTypes.length, 'equipment types');
+    for (const equipType of equipmentTypes) {
+      await client.query(
+        `INSERT INTO equipment_types (company_id, name, brand, model, description, category, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), NOW())`,
+        [companyId, equipType.name, equipType.brand, equipType.model, equipType.description, equipType.category]
+      );
+    }
+    console.log('[Setup] ✓ Created', equipmentTypes.length, 'equipment types');
 
   // 2. Create Company Skills
   const skills = [
@@ -154,9 +156,21 @@ async function seedDemoData(client: any, companyId: string) {
       [companyId, part.name, part.sku, part.category, part.unit_price, part.quantity_in_stock, part.reorder_level]
     );
   }
-  console.log('[Setup] Created', parts.length, 'inventory items');
+  console.log('[Setup] ✓ Created', parts.length, 'inventory items');
 
-  console.log('[Setup] Demo data seeding completed successfully');
+  console.log('[Setup] ✓ Demo data seeding completed successfully');
+  } catch (error: any) {
+    console.error('[Setup] ERROR during demo data seeding:', error);
+    console.error('[Setup] Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      table: error.table,
+      column: error.column,
+      constraint: error.constraint
+    });
+    throw error; // Re-throw to rollback transaction
+  }
 }
 
 /**
@@ -290,8 +304,11 @@ export const initializeSetup = async (req: Request, res: Response) => {
 
       // Seed demo data if requested
       if (includeDemoData === true) {
-        console.log('[Setup] Demo data requested, seeding...');
+        console.log('[Setup] Demo data requested, starting seeding process...');
+        const startTime = Date.now();
         await seedDemoData(client, company.id);
+        const duration = Date.now() - startTime;
+        console.log(`[Setup] Demo data seeding completed in ${duration}ms`);
       } else {
         console.log('[Setup] Demo data not requested, skipping seeding');
       }
@@ -324,8 +341,17 @@ export const initializeSetup = async (req: Request, res: Response) => {
       }
     } as ApiResponse);
   } catch (error: any) {
-    console.error('Error initializing setup:', error);
-    
+    console.error('[Setup] ERROR initializing setup:', error);
+    console.error('[Setup] Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      table: error.table,
+      column: error.column,
+      constraint: error.constraint,
+      stack: error.stack
+    });
+
     // Check for unique constraint violations
     if (error.code === '23505') {
       return res.status(409).json({
@@ -334,9 +360,17 @@ export const initializeSetup = async (req: Request, res: Response) => {
       } as ApiResponse);
     }
 
+    // Check for NOT NULL constraint violations
+    if (error.code === '23502') {
+      return res.status(400).json({
+        success: false,
+        error: `Missing required field: ${error.column} in table ${error.table}`
+      } as ApiResponse);
+    }
+
     return res.status(500).json({
       success: false,
-      error: 'Failed to initialize setup'
+      error: `Failed to initialize setup: ${error.message || 'Unknown error'}`
     } as ApiResponse);
   }
 };
