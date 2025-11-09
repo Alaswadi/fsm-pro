@@ -72,68 +72,10 @@ async function seedDemoData(client: any, companyId: string) {
       [companyId, cert.name, cert.description, cert.issuing_organization, cert.validity_period_months, cert.renewal_required]
     );
   }
-  console.log('[Setup] Created', certifications.length, 'certifications');
+  console.log('[Setup] ✓ Created', certifications.length, 'certifications');
 
-  // 4. Create Sample Customers
-  const customers = [
-    {
-      first_name: 'John',
-      last_name: 'Smith',
-      email: 'john.smith@example.com',
-      phone: '555-0101',
-      address: '123 Main Street',
-      city: 'Springfield',
-      state: 'IL',
-      zip_code: '62701',
-      customer_type: 'residential',
-    },
-    {
-      first_name: 'Sarah',
-      last_name: 'Johnson',
-      email: 'sarah.johnson@example.com',
-      phone: '555-0102',
-      address: '456 Oak Avenue',
-      city: 'Springfield',
-      state: 'IL',
-      zip_code: '62702',
-      customer_type: 'residential',
-    },
-    {
-      company_name: 'Acme Corporation',
-      first_name: 'Michael',
-      last_name: 'Brown',
-      email: 'facilities@acmecorp.com',
-      phone: '555-0103',
-      address: '789 Business Park Drive',
-      city: 'Springfield',
-      state: 'IL',
-      zip_code: '62703',
-      customer_type: 'commercial',
-    },
-  ];
-
-  for (const customer of customers) {
-    await client.query(
-      `INSERT INTO customers (
-        company_id, first_name, last_name, email, phone, address, city, state, zip_code,
-        customer_type, company_name, is_active, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true, NOW(), NOW())`,
-      [
-        companyId,
-        customer.first_name,
-        customer.last_name,
-        customer.email,
-        customer.phone,
-        customer.address,
-        customer.city,
-        customer.state,
-        customer.zip_code,
-        customer.customer_type,
-        customer.company_name || null,
-      ]
-    );
-  }
-  console.log('[Setup] Created', customers.length, 'sample customers');
+  // 4. Skip Sample Customers (table schema mismatch - will be added via UI)
+  console.log('[Setup] ⚠ Skipping sample customers (add via UI after setup)');
 
   // 5. Create Sample Parts/Inventory
   const parts = [
