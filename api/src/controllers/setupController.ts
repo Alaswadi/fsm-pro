@@ -10,25 +10,25 @@ import { ApiResponse } from '../types';
 async function seedDemoData(client: any, companyId: string) {
   console.log('[Setup] Seeding demo data for company:', companyId);
 
-  // 1. Create Equipment Types
+  // 1. Create Equipment Types (with brand and model as required by schema)
   const equipmentTypes = [
-    { name: 'HVAC System', description: 'Heating, Ventilation, and Air Conditioning systems', category: 'HVAC' },
-    { name: 'Furnace', description: 'Gas or electric heating furnaces', category: 'HVAC' },
-    { name: 'Air Conditioner', description: 'Central air conditioning units', category: 'HVAC' },
-    { name: 'Heat Pump', description: 'Heat pump systems for heating and cooling', category: 'HVAC' },
-    { name: 'Water Heater', description: 'Residential and commercial water heaters', category: 'Plumbing' },
-    { name: 'Boiler', description: 'Hot water or steam boilers', category: 'HVAC' },
-    { name: 'Thermostat', description: 'Digital and programmable thermostats', category: 'Controls' },
-    { name: 'Air Handler', description: 'Indoor air handling units', category: 'HVAC' },
-    { name: 'Ductwork', description: 'HVAC duct systems', category: 'HVAC' },
-    { name: 'Refrigeration Unit', description: 'Commercial refrigeration equipment', category: 'Refrigeration' },
+    { name: 'HVAC System', brand: 'Carrier', model: 'Infinity 24', description: 'High-efficiency heating and cooling system', category: 'HVAC' },
+    { name: 'Furnace', brand: 'Trane', model: 'XC95m', description: 'Gas furnace with modulating heat', category: 'HVAC' },
+    { name: 'Air Conditioner', brand: 'Lennox', model: 'XC25', description: 'Variable-capacity air conditioner', category: 'HVAC' },
+    { name: 'Heat Pump', brand: 'Carrier', model: 'Greenspeed', description: 'Variable-speed heat pump system', category: 'HVAC' },
+    { name: 'Water Heater', brand: 'Rheem', model: 'ProTerra', description: 'Hybrid electric water heater', category: 'Plumbing' },
+    { name: 'Boiler', brand: 'Weil-McLain', model: 'Ultra', description: 'High-efficiency gas boiler', category: 'HVAC' },
+    { name: 'Thermostat', brand: 'Honeywell', model: 'T6 Pro', description: 'Programmable smart thermostat', category: 'Controls' },
+    { name: 'Air Handler', brand: 'Goodman', model: 'ARUF', description: 'Multi-position air handler', category: 'HVAC' },
+    { name: 'Ductwork', brand: 'Hart & Cooley', model: 'FlexAir', description: 'Flexible duct system', category: 'HVAC' },
+    { name: 'Refrigeration Unit', brand: 'True', model: 'T-49F', description: 'Commercial reach-in freezer', category: 'Refrigeration' },
   ];
 
   for (const equipType of equipmentTypes) {
     await client.query(
-      `INSERT INTO equipment_types (company_id, name, description, category, is_active, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, true, NOW(), NOW())`,
-      [companyId, equipType.name, equipType.description, equipType.category]
+      `INSERT INTO equipment_types (company_id, name, brand, model, description, category, is_active, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), NOW())`,
+      [companyId, equipType.name, equipType.brand, equipType.model, equipType.description, equipType.category]
     );
   }
   console.log('[Setup] Created', equipmentTypes.length, 'equipment types');
