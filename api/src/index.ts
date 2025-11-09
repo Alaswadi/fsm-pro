@@ -39,7 +39,7 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// CORS configuration - More permissive for development
+// CORS configuration - Allow production and development origins
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -49,7 +49,9 @@ const corsOptions = {
       'http://localhost:3000',
       'http://localhost:3001',
       'http://127.0.0.1:3000',
-      'http://127.0.0.1:3001'
+      'http://127.0.0.1:3001',
+      'https://fsmpro.phishsimulator.com',  // Production frontend
+      'https://fsmproapi.phishsimulator.com' // Production API (for testing)
     ];
 
     // Add custom CORS_ORIGIN if set
@@ -61,7 +63,7 @@ const corsOptions = {
       callback(null, true);
     } else {
       console.warn(`CORS blocked origin: ${origin}`);
-      callback(null, true); // Allow in development, log warning
+      callback(null, true); // Allow anyway, but log warning
     }
   },
   credentials: true,
