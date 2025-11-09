@@ -77,28 +77,8 @@ async function seedDemoData(client: any, companyId: string) {
   // 4. Skip Sample Customers (table schema mismatch - will be added via UI)
   console.log('[Setup] ⚠ Skipping sample customers (add via UI after setup)');
 
-  // 5. Create Sample Parts/Inventory
-  const parts = [
-    { name: 'Air Filter (16x20x1)', sku: 'AF-16201', category: 'Filters', unit_price: 12.99, quantity_in_stock: 50, reorder_level: 10 },
-    { name: 'Air Filter (20x25x1)', sku: 'AF-20251', category: 'Filters', unit_price: 15.99, quantity_in_stock: 40, reorder_level: 10 },
-    { name: 'Capacitor 45/5 MFD', sku: 'CAP-455', category: 'Electrical', unit_price: 24.99, quantity_in_stock: 25, reorder_level: 5 },
-    { name: 'Contactor 30A', sku: 'CONT-30A', category: 'Electrical', unit_price: 35.99, quantity_in_stock: 15, reorder_level: 5 },
-    { name: 'Thermostat Wire 18/8', sku: 'WIRE-188', category: 'Wiring', unit_price: 45.00, quantity_in_stock: 10, reorder_level: 3 },
-    { name: 'Refrigerant R410A (25lb)', sku: 'REF-410A', category: 'Refrigerant', unit_price: 350.00, quantity_in_stock: 8, reorder_level: 2 },
-    { name: 'Condensate Pump', sku: 'PUMP-COND', category: 'Pumps', unit_price: 89.99, quantity_in_stock: 12, reorder_level: 3 },
-    { name: 'Blower Motor 1/2 HP', sku: 'MOTOR-BL12', category: 'Motors', unit_price: 275.00, quantity_in_stock: 5, reorder_level: 2 },
-  ];
-
-  for (const part of parts) {
-    await client.query(
-      `INSERT INTO parts (
-        company_id, name, sku, category, unit_price, quantity_in_stock, reorder_level,
-        is_active, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW(), NOW())`,
-      [companyId, part.name, part.sku, part.category, part.unit_price, part.quantity_in_stock, part.reorder_level]
-    );
-  }
-  console.log('[Setup] ✓ Created', parts.length, 'inventory items');
+  // 5. Skip Sample Parts/Inventory (table schema mismatch - will be added via UI)
+  console.log('[Setup] ⚠ Skipping inventory parts (add via UI after setup)');
 
   console.log('[Setup] ✓ Demo data seeding completed successfully');
   } catch (error: any) {
