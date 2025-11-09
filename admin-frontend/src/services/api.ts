@@ -96,7 +96,9 @@ class ApiService {
   }
 
   async post<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
-    const response = await this.api.post(endpoint, data);
+    // Increase timeout for setup endpoint (demo data seeding can take longer)
+    const config = endpoint === '/setup/initialize' ? { timeout: 60000 } : {};
+    const response = await this.api.post(endpoint, data, config);
     return response.data;
   }
 
