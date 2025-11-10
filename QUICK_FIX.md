@@ -42,10 +42,12 @@ Login with:
 ## What Was Fixed?
 
 1. **API URL**: Changed from `https://fsmproapi.phishsimulator.com/api` to `/api`
-2. **Nginx Proxy**: Fixed to properly route API requests
+2. **Nginx Proxy**: Fixed to properly route API requests (proxy_pass http://api:7001)
 3. **Static Files**: Added manifest.json and handled missing files
 4. **Timeouts**: Increased from 10s to 60s
 5. **CORS**: Fixed headers to always apply
+
+**Note**: The nginx proxy now correctly forwards `/api/` requests to `http://api:7001/api/` (keeping the /api path)
 
 ---
 
