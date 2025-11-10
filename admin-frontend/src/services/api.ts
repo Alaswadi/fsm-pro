@@ -5,9 +5,9 @@ class ApiService {
   private api: AxiosInstance;
 
   constructor() {
-    // Use API domain in production, localhost in development
+    // Use relative URL in production (nginx reverse proxy), localhost in development
     const baseURL = process.env.NODE_ENV === 'production'
-      ? 'https://fsmproapi.phishsimulator.com/api'  // Direct API domain
+      ? '/api'  // Relative URL - works with nginx reverse proxy
       : (process.env.REACT_APP_API_URL || 'http://localhost:3001/api');
 
     console.log('API Base URL:', baseURL);
