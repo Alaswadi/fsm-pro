@@ -319,11 +319,14 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                   color: AppColors.textSecondary,
                 ),
                 const SizedBox(width: 4),
-                Text(
-                  DateFormatter.formatDate(order.scheduledDate),
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
+                Flexible(
+                  child: Text(
+                    DateFormatter.formatDate(order.scheduledDate),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (order.equipmentInfo != null) ...[

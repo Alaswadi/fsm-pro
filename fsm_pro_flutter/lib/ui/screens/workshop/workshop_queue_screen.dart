@@ -177,24 +177,30 @@ class WorkshopJobCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.home_repair_service,
-                          size: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Job #${job.id}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                    Flexible(
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.home_repair_service,
+                            size: 16,
                             color: AppColors.textSecondary,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'Job #${job.id}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     PriorityBadge(priority: job.priority, isCompact: true),
                   ],
                 ),
@@ -270,11 +276,14 @@ class WorkshopJobCard extends StatelessWidget {
                       color: AppColors.textSecondary,
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      DateFormatter.formatDateTime(job.scheduledDate),
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
+                    Flexible(
+                      child: Text(
+                        DateFormatter.formatDateTime(job.scheduledDate),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],

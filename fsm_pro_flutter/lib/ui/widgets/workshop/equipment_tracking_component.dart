@@ -342,11 +342,14 @@ class _CurrentStatusCard extends StatelessWidget {
                   color: AppColors.textSecondary,
                 ),
                 const SizedBox(width: 6),
-                Text(
-                  DateFormatter.formatDateTime(timestamp!),
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
+                Flexible(
+                  child: Text(
+                    DateFormatter.formatDateTime(timestamp!),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
