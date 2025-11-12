@@ -35,7 +35,7 @@ class InventoryRepository {
       }
 
       return Result.success(items);
-    } on AuthException catch (e) {
+    } on AuthException {
       return Result.error('Session expired. Please login again.');
     } on NetworkException catch (e) {
       return Result.error(e.message);

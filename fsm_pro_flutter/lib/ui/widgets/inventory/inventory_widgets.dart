@@ -1,4 +1,4 @@
 /// Inventory related widgets
-library inventory_widgets;
+library;
 
 export 'inventory_item_card.dart';

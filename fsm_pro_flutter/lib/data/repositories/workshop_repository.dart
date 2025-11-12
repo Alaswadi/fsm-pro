@@ -18,7 +18,7 @@ class WorkshopRepository {
     try {
       final jobs = await _apiService.getWorkshopQueue();
       return Result.success(jobs);
-    } on AuthException catch (e) {
+    } on AuthException {
       return Result.error('Session expired. Please login again.');
     } on NetworkException catch (e) {
       return Result.error(e.message);
@@ -39,7 +39,7 @@ class WorkshopRepository {
 
       final job = await _apiService.claimWorkshopJob(jobId);
       return Result.success(job);
-    } on AuthException catch (e) {
+    } on AuthException {
       return Result.error('Session expired. Please login again.');
     } on NetworkException catch (e) {
       return Result.error(e.message);
@@ -60,7 +60,7 @@ class WorkshopRepository {
 
       final status = await _apiService.getEquipmentStatus(jobId);
       return Result.success(status);
-    } on AuthException catch (e) {
+    } on AuthException {
       return Result.error('Session expired. Please login again.');
     } on NetworkException catch (e) {
       return Result.error(e.message);
@@ -93,7 +93,7 @@ class WorkshopRepository {
         notes: notes,
       );
       return Result.success(equipmentStatus);
-    } on AuthException catch (e) {
+    } on AuthException {
       return Result.error('Session expired. Please login again.');
     } on NetworkException catch (e) {
       return Result.error(e.message);
@@ -118,7 +118,7 @@ class WorkshopRepository {
 
       final history = await _apiService.getEquipmentStatusHistory(jobId);
       return Result.success(history);
-    } on AuthException catch (e) {
+    } on AuthException {
       return Result.error('Session expired. Please login again.');
     } on NetworkException catch (e) {
       return Result.error(e.message);
@@ -143,7 +143,7 @@ class WorkshopRepository {
 
       final jobs = await _apiService.getCustomerWorkshopJobs(customerId);
       return Result.success(jobs);
-    } on AuthException catch (e) {
+    } on AuthException {
       return Result.error('Session expired. Please login again.');
     } on NetworkException catch (e) {
       return Result.error(e.message);

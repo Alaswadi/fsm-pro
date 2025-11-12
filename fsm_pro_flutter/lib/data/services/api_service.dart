@@ -324,9 +324,15 @@ class ApiService {
     );
 
     // Handle nested response structure
+    // API returns: {success: true, data: {inventory_items: [...], pagination: {...}}}
     final items = response['success'] == true && response['data'] != null
-        ? response['data']['items'] ?? response['data']
-        : response['items'] ?? response['data'] ?? [];
+        ? response['data']['inventory_items'] ??
+              response['data']['items'] ??
+              response['data']
+        : response['inventory_items'] ??
+              response['items'] ??
+              response['data'] ??
+              [];
 
     return (items as List).map((item) => InventoryItem.fromJson(item)).toList();
   }

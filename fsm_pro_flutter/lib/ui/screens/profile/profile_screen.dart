@@ -209,7 +209,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   );
                 }
               },
-              activeColor: AppColors.success,
+              activeThumbColor: AppColors.success,
             ),
         ],
       ),

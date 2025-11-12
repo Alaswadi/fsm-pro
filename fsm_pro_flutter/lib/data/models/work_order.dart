@@ -232,7 +232,7 @@ class WorkOrder {
       estimatedDuration:
           json['estimated_duration'] ?? json['estimatedDuration'],
       actualDuration: json['actual_duration'] ?? json['actualDuration'],
-      notes: json['notes'],
+      notes: json['technician_notes'] ?? json['notes'],
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : json['createdAt'] != null

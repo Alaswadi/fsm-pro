@@ -976,4 +976,136 @@ class _WorkOrderDetailsScreenState extends State<WorkOrderDetailsScreen> {
 
     notesController.dispose();
   }
+
+  // ==================== Add/Edit Notes Feature ====================
+
+  Future<void> _showAddNotesDialog(WorkOrder workOrder) async {
+    final notesController = TextEditingController(text: workOrder.notes ?? '');
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Technician Notes'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Add or update notes about this job:',
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: notesController,
+                maxLines: 6,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText:
+                      'Enter notes about the work, issues found, parts needed, etc...',
+                  filled: true,
+                  fillColor: AppColors.inputBackground,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.all(12),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'These notes will be saved with the work order.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.save, size: 18),
+            label: const Text('Save Notes'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final notes = notesController.text.trim();
+      await _saveNotes(workOrder, notes);
+    }
+
+    notesController.dispose();
+  }
+
+  Future<void> _saveNotes(WorkOrder workOrder, String notes) async {
+    if (!mounted) return;
+
+    // Show loading
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            ),
+            SizedBox(width: 12),
+            Text('Saving notes...'),
+          ],
+        ),
+        duration: Duration(seconds: 30),
+      ),
+    );
+
+    // Update work order with notes
+    final success = await context
+        .read<WorkOrderProvider>()
+        .updateWorkOrderStatus(
+          workOrder.id,
+          workOrder.status.toApiString(),
+          notes: notes,
+        );
+
+    if (!mounted) return;
+
+    // Hide loading snackbar
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Notes saved successfully'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      // Refresh the details
+      await _loadWorkOrderDetails();
+    } else {
+      final error = context.read<WorkOrderProvider>().error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'Failed to save notes'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 }

@@ -1,5 +1,5 @@
 /// Work order related widgets
-library work_order_widgets;
+library;
 
 export 'status_badge.dart';
 export 'work_order_card.dart';

@@ -980,7 +980,7 @@ export const deleteJob = async (req: AuthRequest, res: Response) => {
 export const updateJobStatus = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, notes } = req.body;
     const companyId = req.company?.id;
 
     if (!companyId) {
@@ -1008,7 +1008,7 @@ export const updateJobStatus = async (req: AuthRequest, res: Response) => {
 
     // Check if job exists
     const existingJobResult = await query(
-      'SELECT status, started_at, completed_at FROM jobs WHERE id = $1 AND company_id = $2',
+      'SELECT status, started_at, completed_at, technician_notes FROM jobs WHERE id = $1 AND company_id = $2',
       [id, companyId]
     );
 
@@ -1031,15 +1031,25 @@ export const updateJobStatus = async (req: AuthRequest, res: Response) => {
       completed_at = new Date().toISOString();
     }
 
-    // Update job status
+    // Handle notes - append to existing notes if provided
+    let technician_notes = existingJob.technician_notes || '';
+    if (notes && notes.trim()) {
+      if (technician_notes) {
+        technician_notes += '\n\n' + notes.trim();
+      } else {
+        technician_notes = notes.trim();
+      }
+    }
+
+    // Update job status and notes
     const updateQuery = `
       UPDATE jobs
-      SET status = $1, started_at = $2, completed_at = $3, updated_at = NOW()
-      WHERE id = $4 AND company_id = $5
+      SET status = $1, started_at = $2, completed_at = $3, technician_notes = $4, updated_at = NOW()
+      WHERE id = $5 AND company_id = $6
       RETURNING *
     `;
 
-    const result = await query(updateQuery, [status, started_at, completed_at, id, companyId]);
+    const result = await query(updateQuery, [status, started_at, completed_at, technician_notes, id, companyId]);
     const updatedJob = result.rows[0];
 
     // If job is being marked as completed, calculate and update total cost
