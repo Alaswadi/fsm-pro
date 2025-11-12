@@ -26,14 +26,10 @@ const existingJobResult = await query(
   [id, companyId]
 );
 
-// Append new notes to existing notes
-let technician_notes = existingJob.technician_notes || '';
-if (notes && notes.trim()) {
-  if (technician_notes) {
-    technician_notes += '\n\n' + notes.trim();
-  } else {
-    technician_notes = notes.trim();
-  }
+// Replace notes if provided, otherwise keep existing
+let technician_notes = existingJob.technician_notes;
+if (notes !== undefined && notes !== null) {
+  technician_notes = notes.trim();
 }
 
 // Update with notes
@@ -93,7 +89,8 @@ This ensures the model checks for `technician_notes` first (which is what the da
 
 - Notes should be saved to the database when you tap "Save Notes"
 - Notes should appear in the work order details after refreshing
-- Multiple note additions should append to existing notes (separated by blank lines)
+- When editing notes, the text field is pre-filled with existing notes
+- Saving replaces the entire notes content (not appending)
 - Notes should persist across app restarts
 - Notes should be visible in both the mobile app and admin panel
 
@@ -125,7 +122,11 @@ The notes are stored in the `technician_notes` TEXT field in the `jobs` table.
 ```
 
 ## Notes
-- The notes feature appends new notes to existing notes, so technicians can add multiple updates over time
-- Notes are separated by double newlines (`\n\n`) for readability
+- The notes feature replaces the entire notes content when saving (edit behavior)
+- The dialog pre-fills with existing notes so technicians can edit them
 - The same endpoint is used for both status updates and note additions
 - When adding notes without changing status, the current status is sent back to the API
+- If you want to preserve old notes, manually keep them in the text field when editing
+
+## Fix for Duplicate Notes Issue (v2)
+The initial implementation appended notes, which caused duplication when editing. The fix was changed to replace notes instead of appending them, which provides a better editing experience.

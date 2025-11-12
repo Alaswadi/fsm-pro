@@ -1031,14 +1031,10 @@ export const updateJobStatus = async (req: AuthRequest, res: Response) => {
       completed_at = new Date().toISOString();
     }
 
-    // Handle notes - append to existing notes if provided
-    let technician_notes = existingJob.technician_notes || '';
-    if (notes && notes.trim()) {
-      if (technician_notes) {
-        technician_notes += '\n\n' + notes.trim();
-      } else {
-        technician_notes = notes.trim();
-      }
+    // Handle notes - replace existing notes if provided, otherwise keep existing
+    let technician_notes = existingJob.technician_notes;
+    if (notes !== undefined && notes !== null) {
+      technician_notes = notes.trim();
     }
 
     // Update job status and notes
