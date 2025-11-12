@@ -27,9 +27,17 @@ export const authenticateToken = async (
 
     const decoded = jwt.verify(token, jwtSecret) as any;
 
-    // Get user from database
+    // Get user from database with technician info if applicable
     const userResult = await query(
-      'SELECT * FROM users WHERE id = $1 AND is_active = true',
+      `SELECT 
+        u.*,
+        t.id as technician_id,
+        t.employee_id,
+        t.is_available,
+        t.hourly_rate
+      FROM users u
+      LEFT JOIN technicians t ON u.id = t.user_id
+      WHERE u.id = $1 AND u.is_active = true`,
       [decoded.userId]
     );
 
