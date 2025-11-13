@@ -590,7 +590,7 @@ CREATE TABLE work_order_inventory_orders (
     total_price DECIMAL(10,2) GENERATED ALWAYS AS (quantity * unit_price) STORED,
     ordered_by UUID NOT NULL,
     ordered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    status VARCHAR(20) DEFAULT 'ordered' CHECK (status IN ('ordered', 'delivered', 'cancelled')),
+    status VARCHAR(20) DEFAULT 'ordered' CHECK (status IN ('ordered', 'accepted', 'delivered', 'cancelled')),
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

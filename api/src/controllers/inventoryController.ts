@@ -1104,15 +1104,27 @@ export const updateInventoryOrderStatus = async (req: AuthRequest, res: Response
     // If status is being changed to 'cancelled', add back to stock
     // Stock was deducted when the order was initially created, so we refund it on cancellation
     if (status === 'cancelled' && currentOrder.status !== 'cancelled') {
-      await query(
-        `UPDATE parts SET current_stock = current_stock + $1, updated_at = NOW() WHERE id = $2 AND company_id = $3`,
+      console.log(`Refunding ${currentOrder.quantity} units of part ${currentOrder.part_id} for cancelled order ${orderId}`);
+      const refundResult = await query(
+        `UPDATE parts SET current_stock = current_stock + $1, updated_at = NOW() WHERE id = $2 AND company_id = $3 RETURNING current_stock`,
         [currentOrder.quantity, currentOrder.part_id, companyId]
       );
+      
+      if (refundResult.rows.length === 0) {
+        console.error(`Failed to refund stock for cancelled order ${orderId}: Part not found`);
+        return res.status(404).json({
+          success: false,
+          error: 'Part not found when trying to refund stock'
+        } as ApiResponse);
+      }
+      
+      console.log(`Successfully refunded stock. New stock level: ${refundResult.rows[0].current_stock}`);
     }
 
     // If status is being changed to 'delivered', verify stock availability
     // (Stock was already deducted when order was created, so we just verify it's still valid)
     if (status === 'delivered' && currentOrder.status !== 'delivered') {
+      console.log(`Verifying part ${currentOrder.part_id} exists for delivered order ${orderId}`);
       // Verify the part still exists
       const stockCheckQuery = `
         SELECT current_stock FROM parts
@@ -1121,20 +1133,24 @@ export const updateInventoryOrderStatus = async (req: AuthRequest, res: Response
       const stockCheckResult = await query(stockCheckQuery, [currentOrder.part_id, companyId]);
 
       if (stockCheckResult.rows.length === 0) {
+        console.error(`Part not found when delivering order ${orderId}`);
         return res.status(404).json({
           success: false,
           error: 'Part not found'
         } as ApiResponse);
       }
+      console.log(`Part verified successfully for delivered order ${orderId}`);
     }
 
     // If status is being changed from 'delivered' to something else (but not cancelled), add back to stock
     // This handles cases like delivered -> ordered or delivered -> accepted
     if (currentOrder.status === 'delivered' && status !== 'delivered' && status !== 'cancelled') {
+      console.log(`Refunding ${currentOrder.quantity} units of part ${currentOrder.part_id} for order ${orderId} changing from delivered to ${status}`);
       await query(
         `UPDATE parts SET current_stock = current_stock + $1, updated_at = NOW() WHERE id = $2 AND company_id = $3`,
         [currentOrder.quantity, currentOrder.part_id, companyId]
       );
+      console.log(`Successfully refunded stock for order ${orderId}`);
     }
 
     // Update the order status
