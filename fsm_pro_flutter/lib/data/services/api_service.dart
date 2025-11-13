@@ -6,6 +6,7 @@ import '../models/api_response.dart';
 import '../models/user.dart';
 import '../models/work_order.dart';
 import '../models/inventory_item.dart';
+import '../models/inventory_order.dart';
 import '../models/equipment_status.dart';
 import 'storage_service.dart';
 
@@ -335,6 +336,49 @@ class ApiService {
               [];
 
     return (items as List).map((item) => InventoryItem.fromJson(item)).toList();
+  }
+
+  /// Process inventory order for a work order
+  /// POST /api/inventory/order
+  Future<Map<String, dynamic>> processInventoryOrder({
+    required String workOrderId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final requestData = {'work_order_id': workOrderId, 'items': items};
+
+    final response = await _handleRequest<Map<String, dynamic>>(
+      () => _dio.post(ApiConstants.inventoryOrder, data: requestData),
+    );
+
+    // Return the full response data
+    return response['success'] == true && response['data'] != null
+        ? response['data']
+        : response;
+  }
+
+  /// Get inventory orders for a work order
+  /// GET /api/inventory/work-orders/:workOrderId/orders
+  Future<(List<InventoryOrder>, InventoryOrderSummary)>
+  getWorkOrderInventoryOrders(String workOrderId) async {
+    final response = await _handleRequest<Map<String, dynamic>>(
+      () => _dio.get(ApiConstants.workOrderInventoryOrders(workOrderId)),
+    );
+
+    // Handle nested response structure
+    final data = response['success'] == true && response['data'] != null
+        ? response['data']
+        : response;
+
+    final ordersData = data['orders'] ?? [];
+    final summaryData = data['summary'] ?? {};
+
+    final orders = (ordersData as List)
+        .map((order) => InventoryOrder.fromJson(order))
+        .toList();
+
+    final summary = InventoryOrderSummary.fromJson(summaryData);
+
+    return (orders, summary);
   }
 
   // ==================== Workshop API Methods ====================

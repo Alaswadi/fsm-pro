@@ -136,6 +136,47 @@ class InventoryProvider extends ChangeNotifier {
     await fetchInventory();
   }
 
+  /// Process inventory order for a work order
+  /// Returns true if successful, false otherwise
+  Future<bool> processInventoryOrder({
+    required String workOrderId,
+    required Map<String, int> selectedItems,
+  }) async {
+    debugPrint(
+      '📦 InventoryProvider: Processing order for work order $workOrderId',
+    );
+    _clearError();
+
+    // Filter out items with quantity 0 and prepare the items list
+    final itemsToOrder = selectedItems.entries
+        .where((entry) => entry.value > 0)
+        .map((entry) => {'item_id': entry.key, 'quantity': entry.value})
+        .toList();
+
+    if (itemsToOrder.isEmpty) {
+      _setError('Please select at least one item to order');
+      return false;
+    }
+
+    debugPrint('📦 InventoryProvider: Ordering ${itemsToOrder.length} items');
+
+    final result = await _inventoryRepository.processInventoryOrder(
+      workOrderId: workOrderId,
+      items: itemsToOrder,
+    );
+
+    if (result.isSuccess) {
+      debugPrint('✅ InventoryProvider: Order processed successfully');
+      // Refresh inventory to get updated stock levels
+      await fetchInventory();
+      return true;
+    } else {
+      debugPrint('❌ InventoryProvider: Order failed - ${result.error}');
+      _setError(result.error ?? 'Failed to process order');
+      return false;
+    }
+  }
+
   // ==================== Private Methods ====================
 
   void _setLoading(bool loading) {

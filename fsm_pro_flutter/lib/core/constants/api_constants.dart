@@ -32,6 +32,9 @@ class ApiConstants {
 
   // Inventory endpoints
   static const String inventory = '/inventory';
+  static const String inventoryOrder = '/inventory/order';
+  static String workOrderInventoryOrders(String workOrderId) =>
+      '/inventory/work-orders/$workOrderId/orders';
 
   // Workshop endpoints
   static const String workshopQueue = '/workshop/queue';

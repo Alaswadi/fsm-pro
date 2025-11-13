@@ -4,10 +4,14 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../data/models/equipment_status.dart';
 import '../../../data/models/work_order.dart';
+import '../../../data/models/inventory_order.dart';
 import '../../../providers/work_order_provider.dart';
+import '../../../providers/inventory_provider.dart';
+import '../../../data/services/api_service.dart';
 import '../../widgets/common/error_view.dart';
 import '../../widgets/common/loading_indicator.dart';
 import '../../widgets/work_order/status_badge.dart';
+import '../../widgets/inventory/inventory_order_dialog.dart';
 
 /// Screen displaying detailed information about a work order
 class WorkOrderDetailsScreen extends StatefulWidget {
@@ -21,6 +25,9 @@ class WorkOrderDetailsScreen extends StatefulWidget {
 
 class _WorkOrderDetailsScreenState extends State<WorkOrderDetailsScreen> {
   bool _isInitialized = false;
+  List<InventoryOrder> _inventoryOrders = [];
+  InventoryOrderSummary? _orderSummary;
+  bool _isLoadingOrders = false;
 
   @override
   void didChangeDependencies() {
@@ -35,6 +42,33 @@ class _WorkOrderDetailsScreenState extends State<WorkOrderDetailsScreen> {
     await context.read<WorkOrderProvider>().fetchWorkOrderDetails(
       widget.workOrderId,
     );
+    // Load inventory orders after work order details are loaded
+    await _loadInventoryOrders();
+  }
+
+  Future<void> _loadInventoryOrders() async {
+    setState(() {
+      _isLoadingOrders = true;
+    });
+
+    try {
+      final apiService = context.read<ApiService>();
+      final result = await apiService.getWorkOrderInventoryOrders(
+        widget.workOrderId,
+      );
+      setState(() {
+        _inventoryOrders = result.$1;
+        _orderSummary = result.$2;
+        _isLoadingOrders = false;
+      });
+    } catch (error) {
+      debugPrint('Error loading inventory orders: $error');
+      setState(() {
+        _inventoryOrders = [];
+        _orderSummary = null;
+        _isLoadingOrders = false;
+      });
+    }
   }
 
   Future<void> _onRefresh() async {
@@ -103,6 +137,11 @@ class _WorkOrderDetailsScreenState extends State<WorkOrderDetailsScreen> {
                       workOrder.equipmentStatus != null) ...[
                     const SizedBox(height: 16),
                     _buildEquipmentTrackingCard(workOrder),
+                  ],
+                  if (workOrder.status == WorkOrderStatus.assigned ||
+                      workOrder.status == WorkOrderStatus.inProgress) ...[
+                    const SizedBox(height: 16),
+                    _buildInventoryOrderCard(),
                   ],
                   const SizedBox(height: 80),
                 ],
@@ -525,6 +564,328 @@ class _WorkOrderDetailsScreenState extends State<WorkOrderDetailsScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildInventoryOrderCard() {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.border, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.inventory_2, size: 20, color: AppColors.primary),
+                    SizedBox(width: 8),
+                    Text(
+                      'Inventory Orders',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                TextButton.icon(
+                  onPressed: () => _showInventoryOrderDialog(),
+                  icon: const Icon(Icons.add_shopping_cart, size: 18),
+                  label: const Text('Order More'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_isLoadingOrders)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_inventoryOrders.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[200]!),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.inventory_2_outlined,
+                      size: 48,
+                      color: Colors.grey[400],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No inventory ordered yet',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Order parts and materials needed for this work order',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () => _showInventoryOrderDialog(),
+                      icon: const Icon(Icons.shopping_cart),
+                      label: const Text('Browse Inventory'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else ...[
+              if (_orderSummary != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildSummaryItem(
+                          'Total Items',
+                          _orderSummary!.totalItems.toString(),
+                          Icons.shopping_bag,
+                        ),
+                      ),
+                      Container(width: 1, height: 30, color: Colors.grey[300]),
+                      Expanded(
+                        child: _buildSummaryItem(
+                          'Total Value',
+                          '\$${_orderSummary!.totalValue.toStringAsFixed(2)}',
+                          Icons.attach_money,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _inventoryOrders.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final order = _inventoryOrders[index];
+                  return _buildOrderItem(order);
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryItem(String label, String value, IconData icon) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 16, color: AppColors.primary),
+        const SizedBox(width: 6),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOrderItem(InventoryOrder order) {
+    final statusColor = _getOrderStatusColor(order.status);
+    final statusText = _getOrderStatusText(order.status);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      order.partName,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Part #${order.partNumber}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  statusText,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Qty: ${order.quantity} × \$${order.unitPrice.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              Text(
+                '\$${order.totalPrice.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Icon(Icons.person_outline, size: 12, color: Colors.grey[500]),
+              const SizedBox(width: 4),
+              Text(
+                'Ordered by ${order.orderedByName ?? 'Unknown'}',
+                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.access_time, size: 12, color: Colors.grey[500]),
+              const SizedBox(width: 4),
+              Text(
+                DateFormatter.formatDateTime(order.orderedAt),
+                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+          if (order.notes != null && order.notes!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.note_outlined, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      order.notes!,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Color _getOrderStatusColor(InventoryOrderStatus status) {
+    switch (status) {
+      case InventoryOrderStatus.pending:
+        return AppColors.warning;
+      case InventoryOrderStatus.ordered:
+        return AppColors.info;
+      case InventoryOrderStatus.accepted:
+        return Colors.blue;
+      case InventoryOrderStatus.delivered:
+        return AppColors.success;
+      case InventoryOrderStatus.cancelled:
+        return AppColors.error;
+    }
+  }
+
+  String _getOrderStatusText(InventoryOrderStatus status) {
+    switch (status) {
+      case InventoryOrderStatus.pending:
+        return 'Pending';
+      case InventoryOrderStatus.ordered:
+        return 'Ordered';
+      case InventoryOrderStatus.accepted:
+        return 'Accepted';
+      case InventoryOrderStatus.delivered:
+        return 'Delivered';
+      case InventoryOrderStatus.cancelled:
+        return 'Cancelled';
+    }
   }
 
   Widget _buildEquipmentStatusTimeline(EquipmentStatus equipmentStatus) {
@@ -978,6 +1339,22 @@ class _WorkOrderDetailsScreenState extends State<WorkOrderDetailsScreen> {
   }
 
   // ==================== Add/Edit Notes Feature ====================
+
+  Future<void> _showInventoryOrderDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => ChangeNotifierProvider(
+        create: (context) =>
+            InventoryProvider(inventoryRepository: context.read()),
+        child: InventoryOrderDialog(workOrderId: widget.workOrderId),
+      ),
+    );
+
+    // If order was successful, refresh work order details
+    if (result == true && mounted) {
+      await _loadWorkOrderDetails();
+    }
+  }
 
   Future<void> _showAddNotesDialog(WorkOrder workOrder) async {
     final notesController = TextEditingController(text: workOrder.notes ?? '');

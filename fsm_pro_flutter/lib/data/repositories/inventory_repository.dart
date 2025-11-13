@@ -45,4 +45,27 @@ class InventoryRepository {
       return Result.error('Failed to load inventory. Please try again.');
     }
   }
+
+  /// Process inventory order for a work order
+  /// Returns Result with order summary on success or error message on failure
+  Future<Result<Map<String, dynamic>>> processInventoryOrder({
+    required String workOrderId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    try {
+      final result = await _apiService.processInventoryOrder(
+        workOrderId: workOrderId,
+        items: items,
+      );
+      return Result.success(result);
+    } on AuthException {
+      return Result.error('Session expired. Please login again.');
+    } on NetworkException catch (e) {
+      return Result.error(e.message);
+    } on AppException catch (e) {
+      return Result.error(e.message);
+    } catch (e) {
+      return Result.error('Failed to process order. Please try again.');
+    }
+  }
 }

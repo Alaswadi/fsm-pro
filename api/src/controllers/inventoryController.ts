@@ -1101,44 +1101,39 @@ export const updateInventoryOrderStatus = async (req: AuthRequest, res: Response
 
     const currentOrder = checkResult.rows[0];
 
-    // If status is being changed to 'delivered', update the part stock
-    if (status === 'delivered' && currentOrder.status !== 'delivered') {
-      // Deduct from inventory stock
-      const updateStockQuery = `
-        UPDATE parts
-        SET current_stock = current_stock - $1,
-            updated_at = NOW()
-        WHERE id = $2 AND company_id = $3
-        RETURNING current_stock
-      `;
-      const stockResult = await query(updateStockQuery, [currentOrder.quantity, currentOrder.part_id, companyId]);
+    // If status is being changed to 'cancelled', add back to stock
+    // Stock was deducted when the order was initially created, so we refund it on cancellation
+    if (status === 'cancelled' && currentOrder.status !== 'cancelled') {
+      await query(
+        `UPDATE parts SET current_stock = current_stock + $1, updated_at = NOW() WHERE id = $2 AND company_id = $3`,
+        [currentOrder.quantity, currentOrder.part_id, companyId]
+      );
+    }
 
-      if (stockResult.rows.length === 0) {
+    // If status is being changed to 'delivered', verify stock availability
+    // (Stock was already deducted when order was created, so we just verify it's still valid)
+    if (status === 'delivered' && currentOrder.status !== 'delivered') {
+      // Verify the part still exists
+      const stockCheckQuery = `
+        SELECT current_stock FROM parts
+        WHERE id = $1 AND company_id = $2
+      `;
+      const stockCheckResult = await query(stockCheckQuery, [currentOrder.part_id, companyId]);
+
+      if (stockCheckResult.rows.length === 0) {
         return res.status(404).json({
           success: false,
           error: 'Part not found'
         } as ApiResponse);
       }
-
-      // Check if stock went negative
-      if (stockResult.rows[0].current_stock < 0) {
-        // Rollback by adding back the quantity
-        await query(
-          `UPDATE parts SET current_stock = current_stock + $1 WHERE id = $2`,
-          [currentOrder.quantity, currentOrder.part_id]
-        );
-        return res.status(400).json({
-          success: false,
-          error: 'Insufficient stock to deliver this order'
-        } as ApiResponse);
-      }
     }
 
-    // If status is being changed from 'delivered' to something else, add back to stock
-    if (currentOrder.status === 'delivered' && status !== 'delivered') {
+    // If status is being changed from 'delivered' to something else (but not cancelled), add back to stock
+    // This handles cases like delivered -> ordered or delivered -> accepted
+    if (currentOrder.status === 'delivered' && status !== 'delivered' && status !== 'cancelled') {
       await query(
-        `UPDATE parts SET current_stock = current_stock + $1, updated_at = NOW() WHERE id = $2`,
-        [currentOrder.quantity, currentOrder.part_id]
+        `UPDATE parts SET current_stock = current_stock + $1, updated_at = NOW() WHERE id = $2 AND company_id = $3`,
+        [currentOrder.quantity, currentOrder.part_id, companyId]
       );
     }
 
