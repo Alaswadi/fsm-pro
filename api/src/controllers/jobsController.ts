@@ -651,16 +651,25 @@ export const createJob = async (req: AuthRequest, res: Response) => {
     };
 
     // Send push notification to assigned technician
+    console.log('📱 Notification check: technician_id =', technician_id, 'Firebase initialized =', isFirebaseInitialized());
+
     if (technician_id && isFirebaseInitialized()) {
       try {
         // Get technician's FCM token via user_id
         const techUserResult = await query(
-          `SELECT u.fcm_token, u.full_name 
+          `SELECT u.fcm_token, u.full_name, t.user_id
            FROM technicians t 
            JOIN users u ON t.user_id = u.id 
            WHERE t.id = $1`,
           [technician_id]
         );
+
+        console.log('📱 Technician query result:', {
+          rowCount: techUserResult.rows.length,
+          hasToken: techUserResult.rows[0]?.fcm_token ? 'YES' : 'NO',
+          userName: techUserResult.rows[0]?.full_name || 'N/A',
+          userId: techUserResult.rows[0]?.user_id || 'N/A'
+        });
 
         if (techUserResult.rows.length > 0 && techUserResult.rows[0].fcm_token) {
           const techUser = techUserResult.rows[0];
@@ -672,6 +681,8 @@ export const createJob = async (req: AuthRequest, res: Response) => {
           );
           const customerName = customerResult.rows[0]?.name || 'Unknown Customer';
 
+          console.log('📱 Sending notification to:', techUser.full_name, 'for job:', job_number);
+
           await sendWorkOrderAssignmentNotification(
             techUser.fcm_token,
             {
@@ -682,11 +693,20 @@ export const createJob = async (req: AuthRequest, res: Response) => {
               scheduledDate: scheduled_date || undefined,
             }
           );
-          console.log(`📱 Push notification sent to technician ${techUser.full_name}`);
+          console.log(`✅ Push notification sent to technician ${techUser.full_name}`);
+        } else {
+          console.log('⚠️ No FCM token found for technician or technician not linked to user');
         }
       } catch (notificationError) {
         // Don't fail the job creation if notification fails
-        console.error('Failed to send push notification:', notificationError);
+        console.error('❌ Failed to send push notification:', notificationError);
+      }
+    } else {
+      if (!technician_id) {
+        console.log('⚠️ No technician assigned, skipping notification');
+      }
+      if (!isFirebaseInitialized()) {
+        console.log('⚠️ Firebase not initialized, skipping notification');
       }
     }
 
