@@ -321,6 +321,27 @@ class ApiService {
 
     return response.data;
   }
+
+  // Analytics methods
+  async getWorkOrderTrends(): Promise<ApiResponse<any>> {
+    return this.get('/analytics/work-order-trends');
+  }
+
+  async getRevenueTrends(): Promise<ApiResponse<any>> {
+    return this.get('/analytics/revenue-trends');
+  }
+
+  async getTechnicianPerformance(): Promise<ApiResponse<any>> {
+    return this.get('/analytics/technician-performance');
+  }
+
+  async getTopCustomers(): Promise<ApiResponse<any>> {
+    return this.get('/analytics/top-customers');
+  }
+
+  async getEquipmentAnalytics(): Promise<ApiResponse<any>> {
+    return this.get('/analytics/equipment');
+  }
 }
 
 export const apiService = new ApiService();

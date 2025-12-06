@@ -15,6 +15,7 @@ import statusRoutes from './status';
 import workshopRoutes from './workshop';
 import invoiceRoutes from './invoices';
 import diagnosticsRoutes from './diagnostics';
+import analyticsRoutes from './analytics';
 import { query } from '../config/database';
 
 const router = Router();
@@ -72,5 +73,6 @@ router.use('/workshop/intake', intakeRoutes);
 router.use('/workshop/status', statusRoutes);
 router.use('/workshop', workshopRoutes);
 router.use('/invoices', invoiceRoutes);
+router.use('/analytics', analyticsRoutes);
 
 export default router;

@@ -22,6 +22,7 @@ import WorkOrders from './pages/WorkOrders';
 import WorkshopQueue from './pages/WorkshopQueue';
 import WorkshopMetrics from './pages/WorkshopMetrics';
 import SetupWizard from './pages/Setup/SetupWizard';
+import Analytics from './pages/Analytics';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -145,29 +146,18 @@ const App: React.FC = () => {
               <Route path="work-orders" element={<WorkOrders />} />
               <Route path="workshop-queue" element={<WorkshopQueue />} />
               <Route path="workshop-metrics" element={<WorkshopMetrics />} />
-              
+
               <Route path="technicians" element={<Technicians />} />
 
               <Route path="customers" element={<Customers />} />
-              
+
               <Route path="equipment" element={<Equipment />} />
 
               <Route path="inventory" element={<Inventory />} />
               <Route path="inventory-orders" element={<InventoryOrders />} />
 
-              <Route
-                path="analytics"
-                element={
-                  <div className="p-6">
-                    <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 text-center">
-                      <i className="ri-bar-chart-line text-6xl text-gray-400 mb-4"></i>
-                      <h2 className="text-2xl font-bold text-gray-900 mb-2">Analytics</h2>
-                      <p className="text-gray-600">Analytics page coming soon...</p>
-                    </div>
-                  </div>
-                } 
-              />
-              
+              <Route path="analytics" element={<Analytics />} />
+
               <Route path="settings" element={<Settings />} />
             </Route>
 

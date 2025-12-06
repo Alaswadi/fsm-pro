@@ -354,3 +354,57 @@ export interface CustomerEquipmentForJob {
   brand: string;
   model: string;
 }
+
+// ============================================================================
+// ANALYTICS TYPES
+// ============================================================================
+
+export interface WorkOrderTrend {
+  week: string;
+  weekLabel: string;
+  total: number;
+  completed: number;
+  pending: number;
+  inProgress: number;
+}
+
+export interface RevenueTrend {
+  month: string;
+  monthLabel: string;
+  revenue: number;
+  jobCount: number;
+}
+
+export interface TechnicianPerformance {
+  id: string;
+  name: string;
+  employeeId: string;
+  completedJobs: number;
+  avgRating: number | null;
+  avgCompletionTime: number | null;
+  revenue: number;
+}
+
+export interface TopCustomer {
+  id: string;
+  name: string;
+  companyName: string | null;
+  totalWorkOrders: number;
+  completedWorkOrders: number;
+  totalRevenue: number;
+  lastServiceDate: string | null;
+}
+
+export interface EquipmentConditionBreakdown {
+  condition: string;
+  count: number;
+  color: string;
+}
+
+export interface EquipmentAnalytics {
+  conditionBreakdown: EquipmentConditionBreakdown[];
+  totalEquipment: number;
+  needingMaintenance: number;
+  warrantyExpiringSoon: number;
+}
+
