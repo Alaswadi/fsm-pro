@@ -8,9 +8,13 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { connectRedis } from './config/redis';
 import routes from './routes';
+import { initializeFirebase } from './services/firebaseService';
 
 // Load environment variables
 dotenv.config();
+
+// Initialize Firebase Admin SDK for push notifications
+initializeFirebase();
 
 const app = express();
 const PORT = process.env.PORT || 3001;

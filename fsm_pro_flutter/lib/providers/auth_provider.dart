@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../data/models/user.dart';
 import '../data/repositories/auth_repository.dart';
 import '../data/services/storage_service.dart';
+import '../core/services/notification_service.dart';
 
 /// Provider for authentication state management.
 /// Manages user authentication, login/logout operations, and auth state persistence.
@@ -49,12 +50,33 @@ class AuthProvider extends ChangeNotifier {
       _currentUser = result.data;
       _setLoading(false);
       notifyListeners();
+
+      // Register FCM token for push notifications (non-blocking)
+      _registerFcmToken();
+
       return true;
     } else {
       debugPrint('❌ AuthProvider: Login failed - ${result.error}');
       _setError(result.error ?? 'Login failed');
       _setLoading(false);
       return false;
+    }
+  }
+
+  /// Register FCM token with backend for push notifications
+  Future<void> _registerFcmToken() async {
+    try {
+      final fcmToken = await NotificationService.getToken();
+      if (fcmToken != null) {
+        final registered = await _authRepository.registerFcmToken(fcmToken);
+        if (registered) {
+          debugPrint('📱 FCM token registered with backend');
+        } else {
+          debugPrint('⚠️ Failed to register FCM token with backend');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error registering FCM token: $e');
     }
   }
 

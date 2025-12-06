@@ -3,6 +3,7 @@ import { query } from '../config/database';
 import { ApiResponse, Job, JobStatus, JobPriority, AuthRequest } from '../types';
 import { checkWorkshopCapacity } from '../services/capacityService';
 import { updateJobTotal } from '../services/invoiceService';
+import { sendWorkOrderAssignmentNotification, isFirebaseInitialized } from '../services/firebaseService';
 
 // Get all jobs/work orders with pagination and filtering
 export const getJobs = async (req: AuthRequest, res: Response) => {
@@ -22,7 +23,7 @@ export const getJobs = async (req: AuthRequest, res: Response) => {
     } = req.query;
 
     const offset = (Number(page) - 1) * Number(limit);
-    
+
     // Get company ID from request context
     const companyId = req.company?.id;
     if (!companyId) {
@@ -100,7 +101,7 @@ export const getJobs = async (req: AuthRequest, res: Response) => {
       LEFT JOIN customers c ON j.customer_id = c.id
       WHERE ${whereClause}
     `;
-    
+
     const countResult = await query(countQuery, queryParams);
     const total = parseInt(countResult.rows[0].total);
     const totalPages = Math.ceil(total / Number(limit));
@@ -384,7 +385,7 @@ export const createJob = async (req: AuthRequest, res: Response) => {
     // Validation
     // For workshop jobs, technician is optional (can be assigned later from queue)
     const isWorkshopJob = location_type === 'workshop';
-    
+
     if (!customer_id || !title || !description) {
       console.log('ERROR: Missing required fields:', {
         customer_id: !!customer_id,
@@ -500,7 +501,7 @@ export const createJob = async (req: AuthRequest, res: Response) => {
     // Check workshop capacity for workshop jobs
     if (isWorkshopJob) {
       const capacityCheck = await checkWorkshopCapacity(companyId);
-      
+
       if (!capacityCheck.isValid) {
         console.log('WARNING: Workshop capacity limit reached');
         // Return warning but allow creation (soft limit)
@@ -648,6 +649,46 @@ export const createJob = async (req: AuthRequest, res: Response) => {
         }
       } : null
     };
+
+    // Send push notification to assigned technician
+    if (technician_id && isFirebaseInitialized()) {
+      try {
+        // Get technician's FCM token via user_id
+        const techUserResult = await query(
+          `SELECT u.fcm_token, u.full_name 
+           FROM technicians t 
+           JOIN users u ON t.user_id = u.id 
+           WHERE t.id = $1`,
+          [technician_id]
+        );
+
+        if (techUserResult.rows.length > 0 && techUserResult.rows[0].fcm_token) {
+          const techUser = techUserResult.rows[0];
+
+          // Get customer name
+          const customerResult = await query(
+            'SELECT name FROM customers WHERE id = $1',
+            [customer_id]
+          );
+          const customerName = customerResult.rows[0]?.name || 'Unknown Customer';
+
+          await sendWorkOrderAssignmentNotification(
+            techUser.fcm_token,
+            {
+              jobNumber: job_number,
+              title: title,
+              customerName: customerName,
+              priority: priority,
+              scheduledDate: scheduled_date || undefined,
+            }
+          );
+          console.log(`📱 Push notification sent to technician ${techUser.full_name}`);
+        }
+      } catch (notificationError) {
+        // Don't fail the job creation if notification fails
+        console.error('Failed to send push notification:', notificationError);
+      }
+    }
 
     res.status(201).json({
       success: true,

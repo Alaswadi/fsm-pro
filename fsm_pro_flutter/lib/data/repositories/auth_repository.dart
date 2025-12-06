@@ -98,4 +98,16 @@ class AuthRepository {
       return Result.error('Failed to update availability. Please try again.');
     }
   }
+
+  /// Register FCM token for push notifications
+  /// Returns true on success, false on failure
+  Future<bool> registerFcmToken(String fcmToken) async {
+    try {
+      await _apiService.registerDevice(fcmToken);
+      return true;
+    } catch (e) {
+      debugPrint('Failed to register FCM token: $e');
+      return false;
+    }
+  }
 }

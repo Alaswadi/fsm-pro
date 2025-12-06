@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'app.dart';
 import 'core/constants/api_constants.dart';
+import 'core/services/notification_service.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/customer_repository.dart';
 import 'data/repositories/inventory_repository.dart';
@@ -25,6 +27,15 @@ void main() async {
   debugPrint('');
   debugPrint('🚀 FSM Pro Mobile App Starting...');
   ApiConstants.logConfiguration();
+  debugPrint('');
+
+  // Initialize Firebase
+  await Firebase.initializeApp();
+  debugPrint('🔥 Firebase initialized');
+
+  // Initialize push notifications
+  await NotificationService.initialize();
+  debugPrint('🔔 Notification service initialized');
   debugPrint('');
 
   // Initialize storage service

@@ -504,4 +504,30 @@ class ApiService {
 
     return user;
   }
+
+  // ==================== Device Registration API Methods ====================
+
+  /// Register device FCM token for push notifications
+  /// POST /api/devices/register
+  Future<void> registerDevice(String fcmToken) async {
+    debugPrint('📱 Registering device FCM token...');
+
+    await _handleRequest<Map<String, dynamic>>(
+      () => _dio.post('/devices/register', data: {'fcm_token': fcmToken}),
+    );
+
+    debugPrint('✅ Device registered for push notifications');
+  }
+
+  /// Unregister device from push notifications
+  /// DELETE /api/devices/unregister
+  Future<void> unregisterDevice() async {
+    debugPrint('📱 Unregistering device...');
+
+    await _handleRequest<Map<String, dynamic>>(
+      () => _dio.delete('/devices/unregister'),
+    );
+
+    debugPrint('✅ Device unregistered from push notifications');
+  }
 }
