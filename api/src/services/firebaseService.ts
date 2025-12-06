@@ -9,7 +9,10 @@ let isInitialized = false;
 
 /**
  * Initialize Firebase Admin SDK
- * Looks for service account credentials in multiple locations
+ * Supports multiple credential sources:
+ * 1. firebase-service-account.json file in api/ folder (for local dev)
+ * 2. FIREBASE_SERVICE_ACCOUNT_BASE64 env var (Base64 encoded JSON - recommended for production)
+ * 3. FIREBASE_SERVICE_ACCOUNT env var (raw JSON - may have issues with special characters)
  */
 export const initializeFirebase = (): boolean => {
     if (isInitialized) {
@@ -17,45 +20,61 @@ export const initializeFirebase = (): boolean => {
     }
 
     try {
-        // Try to find service account file
-        const possiblePaths = [
-            path.join(__dirname, '../../firebase-service-account.json'),
-            path.join(__dirname, '../../../firebase-service-account.json'),
-            path.join(process.cwd(), 'firebase-service-account.json'),
-        ];
+        let serviceAccount: any = null;
 
-        let serviceAccountPath: string | null = null;
-        for (const p of possiblePaths) {
-            if (fs.existsSync(p)) {
-                serviceAccountPath = p;
-                break;
+        // Option 1: Try Base64 encoded environment variable (recommended for production)
+        if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
+            try {
+                const decoded = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8');
+                serviceAccount = JSON.parse(decoded);
+                console.log('🔥 Firebase credentials loaded from FIREBASE_SERVICE_ACCOUNT_BASE64');
+            } catch (e) {
+                console.error('❌ Failed to parse FIREBASE_SERVICE_ACCOUNT_BASE64:', e);
             }
         }
 
-        if (serviceAccountPath) {
-            const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+        // Option 2: Try raw JSON environment variable
+        if (!serviceAccount && process.env.FIREBASE_SERVICE_ACCOUNT) {
+            try {
+                serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+                console.log('🔥 Firebase credentials loaded from FIREBASE_SERVICE_ACCOUNT');
+            } catch (e) {
+                console.error('❌ Failed to parse FIREBASE_SERVICE_ACCOUNT:', e);
+            }
+        }
+
+        // Option 3: Try JSON file (for local development)
+        if (!serviceAccount) {
+            const possiblePaths = [
+                path.join(__dirname, '../../firebase-service-account.json'),
+                path.join(__dirname, '../../../firebase-service-account.json'),
+                path.join(process.cwd(), 'firebase-service-account.json'),
+            ];
+
+            for (const p of possiblePaths) {
+                if (fs.existsSync(p)) {
+                    serviceAccount = JSON.parse(fs.readFileSync(p, 'utf8'));
+                    console.log(`🔥 Firebase credentials loaded from file: ${p}`);
+                    break;
+                }
+            }
+        }
+
+        // Initialize if we have credentials
+        if (serviceAccount) {
             firebaseApp = admin.initializeApp({
                 credential: admin.credential.cert(serviceAccount),
             });
             isInitialized = true;
-            console.log('🔥 Firebase Admin SDK initialized successfully');
+            console.log('✅ Firebase Admin SDK initialized successfully');
             return true;
-        } else {
-            // Check for environment variable
-            if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-                const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-                firebaseApp = admin.initializeApp({
-                    credential: admin.credential.cert(serviceAccount),
-                });
-                isInitialized = true;
-                console.log('🔥 Firebase Admin SDK initialized from environment variable');
-                return true;
-            }
-
-            console.warn('⚠️ Firebase service account not found. Push notifications disabled.');
-            console.warn('   Place firebase-service-account.json in the api/ folder to enable.');
-            return false;
         }
+
+        console.warn('⚠️ Firebase service account not found. Push notifications disabled.');
+        console.warn('   For local dev: place firebase-service-account.json in api/ folder');
+        console.warn('   For production: set FIREBASE_SERVICE_ACCOUNT_BASE64 environment variable');
+        return false;
+
     } catch (error) {
         console.error('❌ Failed to initialize Firebase Admin SDK:', error);
         return false;
