@@ -23,6 +23,7 @@ import WorkshopQueue from './pages/WorkshopQueue';
 import WorkshopMetrics from './pages/WorkshopMetrics';
 import SetupWizard from './pages/Setup/SetupWizard';
 import Analytics from './pages/Analytics';
+import NotificationTest from './pages/NotificationTest';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -159,6 +160,8 @@ const App: React.FC = () => {
               <Route path="analytics" element={<Analytics />} />
 
               <Route path="settings" element={<Settings />} />
+
+              <Route path="notifications" element={<NotificationTest />} />
             </Route>
 
             {/* Catch all route */}

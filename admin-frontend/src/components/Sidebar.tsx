@@ -79,6 +79,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
       icon: 'ri-settings-line',
       path: '/settings',
     },
+    {
+      id: 'notifications',
+      label: 'Notifications',
+      icon: 'ri-notification-line',
+      path: '/notifications',
+    },
   ];
 
   const isActive = (path: string) => {
@@ -91,9 +97,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
 
   return (
     <div
-      className={`bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ${
-        isCollapsed ? 'w-16' : 'w-64'
-      }`}
+      className={`bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'
+        }`}
     >
       {/* Logo */}
       <div className="p-6 border-b border-gray-200">
@@ -113,11 +118,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
           <div
             key={item.id}
             onClick={() => handleNavigation(item.path)}
-            className={`nav-item rounded-lg px-4 py-3 flex items-center space-x-3 cursor-pointer transition-colors ${
-              isActive(item.path)
+            className={`nav-item rounded-lg px-4 py-3 flex items-center space-x-3 cursor-pointer transition-colors ${isActive(item.path)
                 ? 'bg-primary text-white'
                 : 'text-gray-600 hover:bg-gray-100'
-            }`}
+              }`}
           >
             <div className="w-5 h-5 flex items-center justify-center">
               <i className={item.icon}></i>
