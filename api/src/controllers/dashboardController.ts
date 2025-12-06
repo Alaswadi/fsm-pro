@@ -276,7 +276,7 @@ export const getRecentActivities = async (req: AuthRequest, res: Response) => {
     `;
 
     const result = await query(activitiesQuery, [companyId, limit]);
-    
+
     const activities: RecentActivity[] = result.rows.map(row => ({
       id: row.id,
       type: row.type,
@@ -299,6 +299,98 @@ export const getRecentActivities = async (req: AuthRequest, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch recent activities'
+    } as ApiResponse);
+  }
+};
+
+// Work order status breakdown interface
+interface WorkOrderStatusBreakdown {
+  status: string;
+  count: number;
+  color: string;
+}
+
+// Get work order status breakdown for chart
+export const getWorkOrderStatusBreakdown = async (req: AuthRequest, res: Response) => {
+  try {
+    const companyId = req.company?.id;
+    if (!companyId) {
+      return res.status(403).json({
+        success: false,
+        error: 'No company context found'
+      } as ApiResponse);
+    }
+
+    const statusQuery = `
+      SELECT 
+        status,
+        COUNT(*) as count
+      FROM jobs
+      WHERE company_id = $1
+      GROUP BY status
+      ORDER BY 
+        CASE status
+          WHEN 'pending' THEN 1
+          WHEN 'assigned' THEN 2
+          WHEN 'in_progress' THEN 3
+          WHEN 'on_hold' THEN 4
+          WHEN 'completed' THEN 5
+          WHEN 'cancelled' THEN 6
+        END;
+    `;
+
+    const result = await query(statusQuery, [companyId]);
+
+    // Map statuses to colors for the chart
+    const statusColors: Record<string, string> = {
+      pending: '#FCD34D',      // Yellow
+      assigned: '#60A5FA',     // Blue
+      in_progress: '#34D399',  // Green
+      on_hold: '#F97316',      // Orange
+      completed: '#10B981',    // Emerald
+      cancelled: '#EF4444'     // Red
+    };
+
+    const statusLabels: Record<string, string> = {
+      pending: 'Pending',
+      assigned: 'Assigned',
+      in_progress: 'In Progress',
+      on_hold: 'On Hold',
+      completed: 'Completed',
+      cancelled: 'Cancelled'
+    };
+
+    const breakdown: WorkOrderStatusBreakdown[] = result.rows.map(row => ({
+      status: statusLabels[row.status] || row.status,
+      count: parseInt(row.count),
+      color: statusColors[row.status] || '#9CA3AF'
+    }));
+
+    // If no data, return empty breakdown with all statuses
+    if (breakdown.length === 0) {
+      const defaultStatuses = ['Pending', 'Assigned', 'In Progress', 'On Hold', 'Completed', 'Cancelled'];
+      const defaultColors = ['#FCD34D', '#60A5FA', '#34D399', '#F97316', '#10B981', '#EF4444'];
+
+      return res.json({
+        success: true,
+        data: defaultStatuses.map((status, i) => ({
+          status,
+          count: 0,
+          color: defaultColors[i]
+        }))
+      } as ApiResponse<WorkOrderStatusBreakdown[]>);
+    }
+
+    res.json({
+      success: true,
+      data: breakdown
+    } as ApiResponse<WorkOrderStatusBreakdown[]>);
+
+  } catch (error) {
+    console.error('Error fetching work order status breakdown:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch work order status breakdown'
     } as ApiResponse);
   }
 };

@@ -262,6 +262,10 @@ class ApiService {
     return this.get('/dashboard/activities', { limit });
   }
 
+  async getWorkOrderStatusBreakdown(): Promise<ApiResponse<any>> {
+    return this.get('/dashboard/work-order-status');
+  }
+
   // Password reset methods
   async initiatePasswordReset(email: string): Promise<ApiResponse<any>> {
     return this.post('/auth/reset-password', { email });

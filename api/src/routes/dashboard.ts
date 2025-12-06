@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import {
   getDashboardStats,
-  getRecentActivities
+  getRecentActivities,
+  getWorkOrderStatusBreakdown
 } from '../controllers/dashboardController';
 import { authenticateToken } from '../middleware/auth';
 import { addCompanyContext, requireCompanyContext } from '../middleware/company';
@@ -19,4 +20,8 @@ router.get('/stats', getDashboardStats);
 // GET /api/dashboard/activities - Get recent activities
 router.get('/activities', getRecentActivities);
 
+// GET /api/dashboard/work-order-status - Get work order status breakdown for chart
+router.get('/work-order-status', getWorkOrderStatusBreakdown);
+
 export default router;
+

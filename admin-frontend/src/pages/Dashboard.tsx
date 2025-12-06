@@ -1,7 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { DashboardStats, LowStockAlertsResponse, RecentActivity } from '../types';
 import { apiService } from '../services/api';
+
+interface WorkOrderStatusBreakdown {
+  status: string;
+  count: number;
+  color: string;
+}
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -22,8 +29,10 @@ const Dashboard: React.FC = () => {
 
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
   const [lowStockAlerts, setLowStockAlerts] = useState<LowStockAlertsResponse | null>(null);
+  const [workOrderStatusData, setWorkOrderStatusData] = useState<WorkOrderStatusBreakdown[]>([]);
   const [loading, setLoading] = useState(true);
   const [inventoryLoading, setInventoryLoading] = useState(true);
+  const [chartLoading, setChartLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
@@ -44,6 +53,14 @@ const Dashboard: React.FC = () => {
       if (activitiesResponse.success && activitiesResponse.data) {
         setRecentActivities(activitiesResponse.data);
       }
+
+      // Load work order status breakdown
+      setChartLoading(true);
+      const statusResponse = await apiService.getWorkOrderStatusBreakdown();
+      if (statusResponse.success && statusResponse.data) {
+        setWorkOrderStatusData(statusResponse.data);
+      }
+      setChartLoading(false);
 
       setLastUpdated(new Date());
       setSystemStatus('healthy');
@@ -131,13 +148,12 @@ const Dashboard: React.FC = () => {
             <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
             {autoRefresh && <span className="text-green-600">• Auto-refresh enabled</span>}
             <div className="flex items-center space-x-1">
-              <div className={`w-2 h-2 rounded-full ${
-                systemStatus === 'healthy' ? 'bg-green-500' :
+              <div className={`w-2 h-2 rounded-full ${systemStatus === 'healthy' ? 'bg-green-500' :
                 systemStatus === 'warning' ? 'bg-yellow-500' : 'bg-red-500'
-              }`}></div>
+                }`}></div>
               <span className={
                 systemStatus === 'healthy' ? 'text-green-600' :
-                systemStatus === 'warning' ? 'text-yellow-600' : 'text-red-600'
+                  systemStatus === 'warning' ? 'text-yellow-600' : 'text-red-600'
               }>
                 System {systemStatus === 'healthy' ? 'Healthy' : systemStatus === 'warning' ? 'Warning' : 'Error'}
               </span>
@@ -147,11 +163,10 @@ const Dashboard: React.FC = () => {
         <div className="flex items-center space-x-3">
           <button
             onClick={toggleAutoRefresh}
-            className={`flex items-center space-x-2 px-3 py-2 rounded-lg border transition-colors ${
-              autoRefresh
-                ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
-                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-            }`}
+            className={`flex items-center space-x-2 px-3 py-2 rounded-lg border transition-colors ${autoRefresh
+              ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+              : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+              }`}
           >
             <i className={`ri-time-line ${autoRefresh ? 'text-green-600' : 'text-gray-500'}`}></i>
             <span className="text-sm">Auto-refresh</span>
@@ -396,13 +411,69 @@ const Dashboard: React.FC = () => {
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900">Work Order Status</h3>
-            <button className="text-sm text-primary hover:text-blue-700">View All</button>
+            <button
+              onClick={() => navigate('/work-orders')}
+              className="text-sm text-primary hover:text-blue-700"
+            >
+              View All
+            </button>
           </div>
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded-lg">
-            <div className="text-center">
-              <i className="ri-pie-chart-line text-4xl text-gray-400 mb-2"></i>
-              <p className="text-gray-500">Chart will be implemented with Chart.js</p>
-            </div>
+          <div className="h-80">
+            {chartLoading ? (
+              <div className="h-full flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : workOrderStatusData.length > 0 && workOrderStatusData.some(d => d.count > 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={workOrderStatusData.filter(d => d.count > 0)}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ status, count, percent }) =>
+                      `${status}: ${count} (${(percent * 100).toFixed(0)}%)`
+                    }
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="count"
+                  >
+                    {workOrderStatusData.filter(d => d.count > 0).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}
+                    formatter={(value: number, name: string) => [value, 'Count']}
+                    labelFormatter={(label) => `Status: ${label}`}
+                  />
+                  <Legend
+                    layout="horizontal"
+                    verticalAlign="bottom"
+                    align="center"
+                    formatter={(value) => <span className="text-sm text-gray-600">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
+                <div className="text-center">
+                  <i className="ri-inbox-line text-4xl text-gray-400 mb-2"></i>
+                  <p className="text-gray-500">No work orders found</p>
+                  <button
+                    onClick={() => navigate('/work-orders/new')}
+                    className="mt-3 text-sm text-primary hover:text-blue-700 font-medium"
+                  >
+                    Create your first work order →
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
