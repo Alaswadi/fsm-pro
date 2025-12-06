@@ -80,6 +80,8 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  // Add CORP header to allow cross-origin resource loading (fixes favicon.ico and other static files)
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
 
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
@@ -153,7 +155,7 @@ const startServer = async () => {
     } catch (redisError) {
       console.warn('⚠️ Redis connection failed, continuing without Redis:', redisError.message);
     }
-    
+
     app.listen(PORT, () => {
       console.log(`🚀 FSM API Server running on port ${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
