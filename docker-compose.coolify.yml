@@ -66,6 +66,8 @@ services:
     build:
       context: ./admin-frontend
       dockerfile: Dockerfile.coolify
+      args:
+        - REACT_APP_API_URL=${REACT_APP_API_URL}
     container_name: fsm-admin-coolify
     ports:
       - "7000:80"
@@ -94,7 +96,7 @@ volumes:
   postgres_data:
   redis_data:
 
+
 networks:
   fsm-network:
     driver: bridge
-
